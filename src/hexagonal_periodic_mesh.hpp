@@ -46,6 +46,7 @@ struct HexagonalPeriodicMesh {
   
   Int2d edges_on_vertex;
   Int2d cells_on_vertex;
+  Int2d orient_on_vertex;
   
   Real1d area_triangle;
   Real1d lat_vertex;
@@ -97,6 +98,7 @@ struct HexagonalPeriodicMesh {
     // vertex properties
     this->edges_on_vertex = Int2d("edges_on_vertex", nvertices, 3);
     this->cells_on_vertex = Int2d("cells_on_vertex", nvertices, 3);
+    this->orient_on_vertex = Int2d("orient_on_vertex", nvertices, 3);
     
     this->area_triangle = Real1d("area_triangle", nvertices);
     this->lat_vertex = Real1d("lat_vertex", nvertices);
@@ -337,6 +339,24 @@ struct HexagonalPeriodicMesh {
         area_triangle(ivertex) = dc * dc * sqrt(3) / 4;
         for (Int j = 0; j < 3; ++j) {
           kiteareas_on_vertex(ivertex, j) = dc * dc * sqrt(3) / 12;
+        }
+
+        for (Int j = 0; j < 3; ++j) {
+          orient_on_vertex(ivertex, j) = vertices_on_edge(edges_on_vertex(ivertex, j), 0) == ivertex ? -1 : 1;
+
+          //Int iedge = edges_on_vertex(ivertex, j);
+          //Int icell0 = cells_on_edge(iedge, 0);
+          //Int icell1 = cells_on_edge(iedge, 1);
+          //
+          //if (cells_on_vertex(ivertex, 0) == icell0 && cells_on_vertex(ivertex, 1) == icell1) {
+          //  orient_on_vertex(ivertex, j) = 1;
+          //} else if (cells_on_vertex(ivertex, 1) == icell0 && cells_on_vertex(ivertex, 2) == icell1) {
+          //  orient_on_vertex(ivertex, j) = 1;
+          //} else if (cells_on_vertex(ivertex, 2) == icell0 && cells_on_vertex(ivertex, 0) == icell1) {
+          //  orient_on_vertex(ivertex, j) = 1;
+          //} else {
+          //  orient_on_vertex(ivertex, j) = -1;
+          //}
         }
     });
   }

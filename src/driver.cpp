@@ -80,6 +80,49 @@ Real error_divergence(const HexagonalPeriodicMesh &mesh) {
   return yakl::intrinsics::maxval(exact_cell_field);
 }
 
+Real error_curl(const HexagonalPeriodicMesh &mesh) {
+  Real Lx = mesh.period_x;
+  Real Ly = mesh.period_y;
+
+  // input
+  Real1d edge_field("edge_field", mesh.nedges);
+  
+  // output
+  Real1d vertex_field("vertex_field", mesh.nvertices);
+  Real1d exact_vertex_field("exact_vertex_field", mesh.nvertices);
+  
+  parallel_for(mesh.nedges, YAKL_LAMBDA (Int iedge) {
+      Real nx = cos(mesh.angle_edge(iedge));
+      Real ny = sin(mesh.angle_edge(iedge));
+
+      Real x = mesh.x_edge(iedge);
+      Real y = mesh.y_edge(iedge);
+
+      Real v_x = sin(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
+      Real v_y = cos(2 * pi * x / Lx) * sin(2 * pi * y / Ly); 
+
+      edge_field(iedge) = nx * v_x + ny * v_y;
+  });
+
+  parallel_for(mesh.nvertices, YAKL_LAMBDA (Int ivertex) {
+      Real accum = -0;
+      for (Int j = 0; j < 3; ++j) {
+        Int iedge = mesh.edges_on_vertex(ivertex, j);
+        accum += mesh.dc_edge(iedge) * mesh.orient_on_vertex(ivertex, j) * edge_field(iedge);
+      }
+      vertex_field(ivertex) = accum / mesh.area_triangle(ivertex);
+
+      Real x = mesh.x_vertex(ivertex);
+      Real y = mesh.y_vertex(ivertex);
+      exact_vertex_field(ivertex) = 2 * pi * (-1. / Lx + 1. / Ly) * sin(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
+
+      exact_vertex_field(ivertex) -= vertex_field(ivertex);
+      exact_vertex_field(ivertex) = abs(exact_vertex_field(ivertex));
+  });
+
+  return yakl::intrinsics::maxval(exact_vertex_field);
+}
+
 Real error_reconstruction(const HexagonalPeriodicMesh &mesh) {
   Real Lx = mesh.period_x;
   Real Ly = mesh.period_y;
@@ -126,6 +169,7 @@ void run(Int nlevels) {
   
   std::vector<Real> grad_err(nlevels);
   std::vector<Real> div_err(nlevels);
+  std::vector<Real> curl_err(nlevels);
   std::vector<Real> recon_err(nlevels);
   
   for (Int l = 0; l < nlevels; ++l) {
@@ -133,6 +177,7 @@ void run(Int nlevels) {
 
     grad_err[l] = error_gradient(mesh);
     div_err[l] = error_divergence(mesh);
+    curl_err[l] = error_curl(mesh);
     recon_err[l] = error_reconstruction(mesh);
 
     n *= 2;
@@ -152,6 +197,15 @@ void run(Int nlevels) {
     std::cout << l << " " << div_err[l];
     if (l > 0) {
       std::cout << " " << std::log2(div_err[l-1] / div_err[l]);
+    }
+    std::cout << std::endl;
+  }
+  
+  std::cout << "Curl convergence" << std::endl;
+  for (Int l = 0; l < nlevels; ++l) {
+    std::cout << l << " " << curl_err[l];
+    if (l > 0) {
+      std::cout << " " << std::log2(curl_err[l-1] / curl_err[l]);
     }
     std::cout << std::endl;
   }
