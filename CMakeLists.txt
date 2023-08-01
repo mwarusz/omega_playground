@@ -27,3 +27,8 @@ add_executable(driver src/driver.cpp)
 #target_link_libraries(driver lib ${VTK_LIBRARIES})
 target_link_libraries(driver lib)
 yakl_process_target(driver)
+
+add_executable(linear_swe src/linear_swe.cpp)
+#target_link_libraries(driver lib ${VTK_LIBRARIES})
+target_link_libraries(linear_swe lib)
+yakl_process_target(linear_swe)
