@@ -61,9 +61,8 @@ Real error_divergence(const HexagonalPeriodicMesh &mesh) {
   });
 
   parallel_for(mesh.ncells, YAKL_LAMBDA (Int icell) {
-      Int n = mesh.nedges_on_cell(icell);
       Real accum = -0;
-      for (Int j = 0; j < n; ++j) {
+      for (Int j = 0; j < mesh.nedges_on_cell(icell); ++j) {
         Int iedge = mesh.edges_on_cell(icell, j);
         accum += mesh.dv_edge(iedge) * mesh.orient_on_cell(icell, j) * edge_field(iedge);
       }

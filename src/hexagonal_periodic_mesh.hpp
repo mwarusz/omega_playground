@@ -56,11 +56,11 @@ struct HexagonalPeriodicMesh {
   Real1d z_vertex;
   Real2d kiteareas_on_vertex;
 
-  HexagonalPeriodicMesh(Int nx, Int ny) : nx(nx), ny(ny) {
+  HexagonalPeriodicMesh(Int nx, Int ny) : HexagonalPeriodicMesh(nx, ny, 1. / nx) {}
+  HexagonalPeriodicMesh(Int nx, Int ny, Real dc) : nx(nx), ny(ny), dc(dc) {
     this->ncells = nx * ny;
     this->nedges = 3 * ncells;
     this->nvertices = 2 * ncells;
-    this->dc = 1. / nx;
     this->period_x = nx * dc;
     this->period_y = ny * dc * sqrt(3) / 2;
 
