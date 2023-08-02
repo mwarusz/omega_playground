@@ -5,7 +5,38 @@
 static constexpr Real h0 = 1000;
 static constexpr Real eta0 = 1;
 static constexpr Real g0 = 10;
-static constexpr Real f0 = 1;
+static constexpr Real f0 = 1e-4;
+
+Real compute_energy(Real1d h, Real1d v, const HexagonalPeriodicMesh &mesh) {
+  Real1d cell_tmp("cell_tmp", mesh.ncells);
+  parallel_for("compute_energy_1", mesh.ncells, YAKL_LAMBDA (Int icell) {
+      Real K = 0;
+      for (Int j = 0; j < mesh.nedges_on_cell(icell); ++j) {
+        Int iedge = mesh.edges_on_cell(icell, j);
+        Real area_edge = mesh.dv_edge(iedge) * mesh.dc_edge(iedge);
+        K += area_edge * v(iedge) * v(iedge) / 4;
+      }
+      K /= mesh.area_cell(icell);
+
+      //cell_tmp(icell) = mesh.area_cell(icell) * (g0 * h(icell) * h(icell) / 2 + h0 * K);
+      cell_tmp(icell) = mesh.area_cell(icell) * (g0 * h(icell) * h(icell) / 2);
+  });
+  
+  Real1d edge_tmp("edge_tmp", mesh.nedges);
+  parallel_for("compute_energy_2", mesh.nedges, YAKL_LAMBDA (Int iedge) {
+      Real vt = -0;
+      for (Int j = 0; j < mesh.nedges_on_edge(iedge); ++j) {
+        Int iedge2 = mesh.edges_on_edge(iedge, j);
+        vt += mesh.weights_on_edge(iedge, j) * mesh.dv_edge(iedge2) * v(iedge2);
+      }
+      vt /= mesh.dc_edge(iedge);
+
+      edge_tmp(iedge) = h0 * v(iedge) * v(iedge) * mesh.dc_edge(iedge) * mesh.dv_edge(iedge) / 2;
+  });
+
+  return yakl::intrinsics::sum(cell_tmp) + yakl::intrinsics::sum(edge_tmp);
+  //return yakl::intrinsics::sum(cell_tmp);
+}
 
 YAKL_INLINE Real h_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
   return eta0 * cos(kx * x + ky * y - omega * t);
@@ -51,7 +82,7 @@ void compute_tendency(
   });
 }
 
-void run(Int n) {
+Real run(Int n) {
     Real lx = 1000;
     Real ly = std::sqrt(3) / 2 * lx;
     Real kx = 2 * (2 * pi / lx);
@@ -60,8 +91,8 @@ void run(Int n) {
 
     HexagonalPeriodicMesh mesh(n, n, lx / n);
     
-    Real timeend = 1;
-    Real cfl = 0.2;
+    Real timeend = 20;
+    Real cfl = 0.01;
     Real dt = cfl * mesh.dc / std::sqrt(g0 * h0);
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
@@ -103,6 +134,8 @@ void run(Int n) {
         1720146321549. / 2090206949498., 3134564353537. / 4481467310338.,
         2277821191437. / 14882151754819.};
 
+    Real en0 = compute_energy(h, v, mesh);
+
     for (Int step = 0; step < numberofsteps; ++step) {
       for (Int stage = 0; stage < nstages; ++stage) {
         
@@ -123,20 +156,41 @@ void run(Int n) {
         });
       }
     }
+    
+    Real enf = compute_energy(h, v, mesh);
+    std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
 
     parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
         hexact(icell) -= h(icell);
         hexact(icell) = std::abs(hexact(icell));
     });
     
-    std::cout << yakl::intrinsics::maxval(h) << std::endl;
-    std::cout << yakl::intrinsics::maxval(v) << std::endl;
-    std::cout << yakl::intrinsics::maxval(hexact) << std::endl;
+    //std::cout << yakl::intrinsics::maxval(h) << std::endl;
+    //std::cout << yakl::intrinsics::maxval(v) << std::endl;
+    return yakl::intrinsics::maxval(hexact);
 }
 
 
 int main() {
   yakl::init();
-  run(32);
+
+  Int nlevels = 1;
+  std::vector<Real> err(nlevels);
+  Int n = 16;
+  
+  for (Int l = 0; l < nlevels; ++l) {
+    err[l] = run(n);
+    n *= 2;
+  }
+
+  std::cout << "Inertia gravity wave convergence" << std::endl;
+  for (Int l = 0; l < nlevels; ++l) {
+    std::cout << l << " " << err[l];
+    if (l > 0) {
+      std::cout << " " << std::log2(err[l-1] / err[l]);
+    }
+    std::cout << std::endl;
+  }
+
   yakl::finalize();
 }
