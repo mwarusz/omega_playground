@@ -56,4 +56,28 @@ void LinearShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) co
   });
 }
 
+Real LinearShallowWater::compute_energy(Real1d h, Real1d v) const {
+  Real1d cell_energy("cell_energy", mesh->ncells);
+  
+  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
+  YAKL_SCOPE(dv_edge, mesh->dv_edge);
+  YAKL_SCOPE(dc_edge, mesh->dc_edge);
+  YAKL_SCOPE(area_cell, mesh->area_cell);
+  YAKL_SCOPE(grav, this->grav);
+  YAKL_SCOPE(h0, this->h0);
+
+  parallel_for("compute_energy", mesh->ncells, YAKL_LAMBDA (Int icell) {
+      Real K = 0;
+      for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+        Int jedge = edges_on_cell(icell, j);
+        Real area_edge = dv_edge(jedge) * dc_edge(jedge);
+        K += area_edge * v(jedge) * v(jedge) / 4;
+      }
+      K /= area_cell(icell);
+      cell_energy(icell) = area_cell(icell) * (grav * h(icell) * h(icell) / 2 + h0 * K);
+  });
+  return yakl::intrinsics::sum(cell_energy);
+}
+
 }

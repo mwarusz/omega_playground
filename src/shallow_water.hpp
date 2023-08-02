@@ -11,6 +11,7 @@ struct ShallowWater {
   
   virtual void compute_h_tendency(Real1d vtend, Real1d h, Real1d v) const {}
   virtual void compute_v_tendency(Real1d htend, Real1d h, Real1d v) const {}
+  virtual Real compute_energy(Real1d h, Real1d v) const {return 0;}
   
   void compute_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v) const {
     compute_h_tendency(htend, h, v);
@@ -26,6 +27,7 @@ struct LinearShallowWater : ShallowWater {
   Real f0;
   void compute_h_tendency(Real1d vtend, Real1d h, Real1d v) const override;
   void compute_v_tendency(Real1d htend, Real1d h, Real1d v) const override;
+  Real compute_energy(Real1d h, Real1d v) const override;
 
   LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0);
   LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0, Real grav);
