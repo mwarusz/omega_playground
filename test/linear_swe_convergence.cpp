@@ -54,36 +54,6 @@ YAKL_INLINE Real vy_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) 
   return eta0 * g0 / (omega * omega - f0 * f0) * (omega * ky * std::cos(a) + f0 * kx * std::sin(a)) ;
 }
 
-void compute_tendency(
-    Real1d htend, Real1d vtend,
-    Real1d h, Real1d v,
-    const PlanarHexagonalMesh &mesh)  {
-
-  parallel_for("compute_h_tendency", mesh.ncells, YAKL_LAMBDA (Int icell) {
-      Real accum = -0;
-      for (Int j = 0; j < mesh.nedges_on_cell(icell); ++j) {
-        Int iedge = mesh.edges_on_cell(icell, j);
-        accum += mesh.dv_edge(iedge) * mesh.orient_on_cell(icell, j) * v(iedge);
-      }
-      htend(icell) += -h0 * accum / mesh.area_cell(icell);
-  });
-
-  parallel_for("compute_v_tendency", mesh.nedges, YAKL_LAMBDA (Int iedge) {
-      Real vt = -0;
-      for (Int j = 0; j < mesh.nedges_on_edge(iedge); ++j) {
-        Int iedge2 = mesh.edges_on_edge(iedge, j);
-        vt += mesh.weights_on_edge(iedge, j) * mesh.dv_edge(iedge2) * v(iedge2);
-      }
-      vt /= mesh.dc_edge(iedge);
-
-      Int icell0 = mesh.cells_on_edge(iedge, 0);
-      Int icell1 = mesh.cells_on_edge(iedge, 1);
-      Real grad_h = (h(icell1) - h(icell0)) / mesh.dc_edge(iedge);
-
-      vtend(iedge) += f0 * vt - g0 * grad_h;
-  });
-}
-
 Real run(Int n) {
     Real lx = 1000;
     Real ly = std::sqrt(3) / 2 * lx;
@@ -92,6 +62,7 @@ Real run(Int n) {
     Real omega = std::sqrt(f0 * f0 + g0 * h0 * (kx * kx + ky * ky));
 
     PlanarHexagonalMesh mesh(n, n, lx / n);
+    LinearShallowWater sw(mesh, h0, f0, g0);
     
     Real timeend = 20;
     Real cfl = 0.01;
@@ -148,7 +119,7 @@ Real run(Int n) {
             vtend(iedge) *= rka[stage];
         });
 
-        compute_tendency(htend, vtend, h, v, mesh);
+        sw.compute_tendency(htend, vtend, h, v);
         
         parallel_for("lsrk2_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
             h(icell) += dt * rkb[stage] * htend(icell);
