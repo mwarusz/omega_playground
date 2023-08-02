@@ -12,23 +12,11 @@ FetchContent_Declare(yakl
 
 FetchContent_MakeAvailable(yakl)
 
-add_library(lib INTERFACE)
-target_include_directories(lib INTERFACE
+add_library(omega src/planar_hexagonal_mesh.cpp)
+target_link_libraries(omega PUBLIC yakl)
+target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-#find_package(VTK COMPONENTS 
-#  CommonCore
-#  CommonDataModel
-#  IOXML
-#)
-
-add_executable(driver src/driver.cpp)
-#target_link_libraries(driver lib ${VTK_LIBRARIES})
-target_link_libraries(driver lib)
-yakl_process_target(driver)
-
-add_executable(linear_swe src/linear_swe.cpp)
-#target_link_libraries(driver lib ${VTK_LIBRARIES})
-target_link_libraries(linear_swe lib)
-yakl_process_target(linear_swe)
+enable_testing()
+add_subdirectory(test)

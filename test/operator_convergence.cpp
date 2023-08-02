@@ -1,8 +1,10 @@
-#include <hexagonal_periodic_mesh.hpp>
+#include <omega.hpp>
 #include <iostream>
 #include <vector>
 
-Real error_gradient(const HexagonalPeriodicMesh &mesh) {
+using namespace omega;
+
+Real error_gradient(const PlanarHexagonalMesh &mesh) {
   Real Lx = mesh.period_x;
   Real Ly = mesh.period_y;
 
@@ -39,7 +41,7 @@ Real error_gradient(const HexagonalPeriodicMesh &mesh) {
   return yakl::intrinsics::maxval(exact_edge_field);
 }
 
-Real error_divergence(const HexagonalPeriodicMesh &mesh) {
+Real error_divergence(const PlanarHexagonalMesh &mesh) {
   Real Lx = mesh.period_x;
   Real Ly = mesh.period_y;
 
@@ -79,7 +81,7 @@ Real error_divergence(const HexagonalPeriodicMesh &mesh) {
   return yakl::intrinsics::maxval(exact_cell_field);
 }
 
-Real error_curl(const HexagonalPeriodicMesh &mesh) {
+Real error_curl(const PlanarHexagonalMesh &mesh) {
   Real Lx = mesh.period_x;
   Real Ly = mesh.period_y;
 
@@ -122,7 +124,7 @@ Real error_curl(const HexagonalPeriodicMesh &mesh) {
   return yakl::intrinsics::maxval(exact_vertex_field);
 }
 
-Real error_reconstruction(const HexagonalPeriodicMesh &mesh) {
+Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
   Real Lx = mesh.period_x;
   Real Ly = mesh.period_y;
 
@@ -172,7 +174,7 @@ void run(Int nlevels) {
   std::vector<Real> recon_err(nlevels);
   
   for (Int l = 0; l < nlevels; ++l) {
-    HexagonalPeriodicMesh mesh(n, n);
+    PlanarHexagonalMesh mesh(n, n);
 
     grad_err[l] = error_gradient(mesh);
     div_err[l] = error_divergence(mesh);

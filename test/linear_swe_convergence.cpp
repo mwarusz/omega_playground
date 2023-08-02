@@ -1,13 +1,15 @@
-#include <hexagonal_periodic_mesh.hpp>
+#include <omega.hpp>
 #include <iostream>
 #include <vector>
+
+using namespace omega;
 
 static constexpr Real h0 = 1000;
 static constexpr Real eta0 = 1;
 static constexpr Real g0 = 10;
 static constexpr Real f0 = 1e-4;
 
-Real compute_energy(Real1d h, Real1d v, const HexagonalPeriodicMesh &mesh) {
+Real compute_energy(Real1d h, Real1d v, const PlanarHexagonalMesh &mesh) {
   Real1d cell_tmp("cell_tmp", mesh.ncells);
   parallel_for("compute_energy_1", mesh.ncells, YAKL_LAMBDA (Int icell) {
       Real K = 0;
@@ -55,7 +57,7 @@ YAKL_INLINE Real vy_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) 
 void compute_tendency(
     Real1d htend, Real1d vtend,
     Real1d h, Real1d v,
-    const HexagonalPeriodicMesh &mesh)  {
+    const PlanarHexagonalMesh &mesh)  {
 
   parallel_for("compute_h_tendency", mesh.ncells, YAKL_LAMBDA (Int icell) {
       Real accum = -0;
@@ -89,7 +91,7 @@ Real run(Int n) {
     Real ky = 2 * (2 * pi / ly);
     Real omega = std::sqrt(f0 * f0 + g0 * h0 * (kx * kx + ky * ky));
 
-    HexagonalPeriodicMesh mesh(n, n, lx / n);
+    PlanarHexagonalMesh mesh(n, n, lx / n);
     
     Real timeend = 20;
     Real cfl = 0.01;

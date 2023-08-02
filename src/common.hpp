@@ -3,6 +3,8 @@
 #include <YAKL.h>
 #include <cmath>
 
+namespace omega {
+
 using Real = double;
 using Int = int;
 
@@ -36,3 +38,4 @@ using IntHost1d = yakl::Array<Int, 1, yakl::memHost, yakl::styleC>;
 using IntHost2d = yakl::Array<Int, 2, yakl::memHost, yakl::styleC>;
 using IntHost3d = yakl::Array<Int, 3, yakl::memHost, yakl::styleC>;
 using IntHost4d = yakl::Array<Int, 4, yakl::memHost, yakl::styleC>;
+}
