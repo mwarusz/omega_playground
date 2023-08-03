@@ -31,7 +31,8 @@ Real run(Int n) {
     Real omega = std::sqrt(f0 * f0 + g0 * h0 * (kx * kx + ky * ky));
 
     PlanarHexagonalMesh mesh(n, n, lx / n);
-    LinearShallowWater sw(mesh, h0, f0, g0);
+    LinearShallowWater shallow_water(mesh, h0, f0, g0);
+    LSRKStepper stepper(shallow_water);
     
     Real timeend = 20;
     Real cfl = 0.01;
@@ -59,47 +60,13 @@ Real run(Int n) {
         Real vy = vy_exact(x, y, 0, kx, ky, omega);
         v(iedge) = nx * vx + ny * vy;
     });
-    
-    Real1d htend("htend", mesh.ncells);
-    Real1d vtend("vtend", mesh.nedges);
-    yakl::memset(htend, 0);
-    yakl::memset(vtend, 0);
 
-
-    const Int nstages = 5;
-    Real rka[] = {
-        0., -567301805773. / 1357537059087., -2404267990393. / 2016746695238.,
-        -3550918686646. / 2091501179385., -1275806237668. / 842570457699.};
-
-    Real rkb[] = {
-        1432997174477. / 9575080441755., 5161836677717. / 13612068292357.,
-        1720146321549. / 2090206949498., 3134564353537. / 4481467310338.,
-        2277821191437. / 14882151754819.};
-
-    Real en0 = sw.compute_energy(h, v);
-
+    Real en0 = shallow_water.compute_energy(h, v);
     for (Int step = 0; step < numberofsteps; ++step) {
-      for (Int stage = 0; stage < nstages; ++stage) {
-        
-        parallel_for("lsrk1_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
-            htend(icell) *= rka[stage];
-        });
-        parallel_for("lsrk1_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
-            vtend(iedge) *= rka[stage];
-        });
-
-        sw.compute_tendency(htend, vtend, h, v);
-        
-        parallel_for("lsrk2_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
-            h(icell) += dt * rkb[stage] * htend(icell);
-        });
-        parallel_for("lsrk2_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
-            v(iedge) += dt * rkb[stage] * vtend(iedge);
-        });
-      }
+      stepper.do_step(dt, h, v);
     }
-    
-    Real enf = sw.compute_energy(h, v);
+    Real enf = shallow_water.compute_energy(h, v);
+
     std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
 
     parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
@@ -107,8 +74,6 @@ Real run(Int n) {
         hexact(icell) = std::abs(hexact(icell));
     });
     
-    //std::cout << yakl::intrinsics::maxval(h) << std::endl;
-    //std::cout << yakl::intrinsics::maxval(v) << std::endl;
     return yakl::intrinsics::maxval(hexact);
 }
 

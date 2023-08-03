@@ -15,6 +15,7 @@ FetchContent_MakeAvailable(yakl)
 add_library(omega
   src/planar_hexagonal_mesh.cpp
   src/shallow_water.cpp
+  src/time_stepper.cpp
 )
 target_link_libraries(omega PUBLIC yakl)
 target_include_directories(omega PUBLIC
