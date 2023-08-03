@@ -2,9 +2,61 @@
 
 namespace omega {
 
+// Nonlinear
+
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh) : mesh(&mesh) {}
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real grav) :
     mesh(&mesh), grav(grav) {}
+
+void ShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) const {
+  YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
+  YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
+  YAKL_SCOPE(area_triangle, mesh->area_triangle);
+  YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
+  YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
+  YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
+  YAKL_SCOPE(dv_edge, mesh->dv_edge);
+  YAKL_SCOPE(dc_edge, mesh->dc_edge);
+  YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
+  YAKL_SCOPE(grav, this->grav);
+  YAKL_SCOPE(f0, this->f0);
+  
+  Real1d qv("qv", mesh.vertices);
+  parallel_for("compute_qv", mesh->nvertices, YAKL_LAMBDA (Int ivertex) {
+      Real qv_i = -0;
+      for (Int j = 0; j < 3; ++j) {
+        Int jedge = edges_on_vertex(ivertex, j);
+        qv_i += dc_edge(jedge) * orient_on_vertex(ivertex, j) * edge_field(jedge);
+      }
+      qv(ivertex) = qv_i / area_triangle(ivertex);
+  });
+
+  //Real1d qe("qe", mesh.nedges);
+  //parallel_for("compute_qe", mesh->nedges, YAKL_LAMBDA (Int iedge) {
+  //    Real qe_i = -0;
+  //    for (Int j = 0; j < 2; ++j) {
+  //      Int jvertex = vertices_on_edge(iedge, j);
+  //      qe_i += 
+  //    }
+  //});
+
+  parallel_for("compute_v_tendency", mesh->nedges, YAKL_LAMBDA (Int iedge) {
+      Real vt = -0;
+      for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+        Int jedge = edges_on_edge(iedge, j);
+        vt += weights_on_edge(iedge, j) * dv_edge(jedge) * v(jedge);
+      }
+      vt /= dc_edge(iedge);
+
+      Int icell0 = cells_on_edge(iedge, 0);
+      Int icell1 = cells_on_edge(iedge, 1);
+      Real grad_h = (h(icell1) - h(icell0)) / dc_edge(iedge);
+
+      vtend(iedge) += f0 * vt - grav * grad_h;
+  });
+}
+
+// Linear
 
 LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0) :
     ShallowWater(mesh), h0(h0), f0(f0) {}

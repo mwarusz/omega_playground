@@ -9,9 +9,9 @@ struct ShallowWater {
   PlanarHexagonalMesh *mesh;
   Real grav = 9.81;
   
-  virtual void compute_h_tendency(Real1d vtend, Real1d h, Real1d v) const {}
-  virtual void compute_v_tendency(Real1d htend, Real1d h, Real1d v) const {}
-  virtual Real compute_energy(Real1d h, Real1d v) const {return 0;}
+  virtual void compute_h_tendency(Real1d vtend, Real1d h, Real1d v);
+  virtual void compute_v_tendency(Real1d htend, Real1d h, Real1d v);
+  virtual Real compute_energy(Real1d h, Real1d v) const;
   
   void compute_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v) const {
     compute_h_tendency(htend, h, v);
