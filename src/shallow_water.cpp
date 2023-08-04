@@ -67,7 +67,7 @@ void ShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) const {
         hv_i += kiteareas_on_vertex(ivertex, j) * h(jcell);
       }
 
-      qv(ivertex) = qv_i / hv_i;
+      qv(ivertex) = (qv_i + f0 * area_triangle(ivertex)) / hv_i;
   });
 
   Real1d qe("qe", mesh->nedges);

@@ -8,6 +8,7 @@ namespace omega {
 struct ShallowWater {
   PlanarHexagonalMesh *mesh;
   Real grav = 9.81;
+  // TODO: generalize to variable f
   Real f0;
   
   virtual void compute_h_tendency(Real1d vtend, Real1d h, Real1d v) const;
