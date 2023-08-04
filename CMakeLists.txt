@@ -17,7 +17,7 @@ add_library(omega
   src/shallow_water.cpp
   src/time_stepper.cpp
 )
-target_link_libraries(omega PUBLIC yakl)
+yakl_process_target(omega)
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
