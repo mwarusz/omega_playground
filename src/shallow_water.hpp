@@ -17,9 +17,19 @@ struct ShallowWater {
   virtual Real compute_energy(Real1d h, Real1d v) const;
   
   void compute_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v, Real t) const {
+    yakl::timer_start("compute_tendency");
+    
+    yakl::timer_start("h_tendency");
     compute_h_tendency(htend, h, v);
+    yakl::timer_stop("h_tendency");
+
+    yakl::timer_start("v_tendency");
     compute_v_tendency(vtend, h, v);
+    yakl::timer_stop("v_tendency");
+
     additional_tendency(htend, vtend, h, v, t);
+
+    yakl::timer_stop("compute_tendency");
   }
 
   ShallowWater(PlanarHexagonalMesh &mesh, Real f0);
