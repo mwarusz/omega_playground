@@ -63,7 +63,8 @@ Real run(Int n) {
 
     Real en0 = shallow_water.compute_energy(h, v);
     for (Int step = 0; step < numberofsteps; ++step) {
-      stepper.do_step(dt, h, v);
+      Real t = step * dt;
+      stepper.do_step(t, dt, h, v);
     }
     Real enf = shallow_water.compute_energy(h, v);
 

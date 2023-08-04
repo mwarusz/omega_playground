@@ -12,11 +12,13 @@ struct ShallowWater {
   
   virtual void compute_h_tendency(Real1d vtend, Real1d h, Real1d v) const;
   virtual void compute_v_tendency(Real1d htend, Real1d h, Real1d v) const;
+  virtual void additional_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v, Real t) const {}
   virtual Real compute_energy(Real1d h, Real1d v) const;
   
-  void compute_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v) const {
+  void compute_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v, Real t) const {
     compute_h_tendency(htend, h, v);
     compute_v_tendency(vtend, h, v);
+    additional_tendency(htend, vtend, h, v, t);
   }
 
   ShallowWater(PlanarHexagonalMesh &mesh, Real f0);

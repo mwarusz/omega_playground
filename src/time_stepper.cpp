@@ -22,9 +22,14 @@ LSRKStepper::LSRKStepper(ShallowWater &shallow_water) :
       1720146321549. / 2090206949498., 3134564353537. / 4481467310338.,
       2277821191437. / 14882151754819.
   };
+  
+  rkc = {
+        0., 1432997174477. / 9575080441755., 2526269341429. / 6820363962896.,
+        2006345519317. / 3224310063776., 2802321613138. / 2924317926251.
+  };
 }
 
-void LSRKStepper::do_step(Real dt, Real1d h, Real1d v) const {
+void LSRKStepper::do_step(Real t, Real dt, Real1d h, Real1d v) const {
   auto mesh = shallow_water->mesh;
 
   YAKL_SCOPE(htend, this->htend);
@@ -39,7 +44,8 @@ void LSRKStepper::do_step(Real dt, Real1d h, Real1d v) const {
         vtend(iedge) *= rka_stage;
     });
 
-    shallow_water->compute_tendency(htend, vtend, h, v);
+    Real stagetime = t + rkc[stage] * dt;
+    shallow_water->compute_tendency(htend, vtend, h, v, stagetime);
     
     Real rkb_stage = rkb[stage];
     parallel_for("lsrk2_h", mesh->ncells, YAKL_LAMBDA (Int icell) {
