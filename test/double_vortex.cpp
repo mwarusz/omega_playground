@@ -126,13 +126,21 @@ void run(Int nx, Real cfl) {
         v(iedge) = nx * vx + ny * vy;
     });
 
-    Real en0 = shallow_water.compute_energy(h, v);
+    Real mass0 = shallow_water.mass_integral(h);
+    Real cir0 = shallow_water.circulation_integral(v);
+    Real en0 = shallow_water.energy_integral(h, v);
+
     for (Int step = 0; step < numberofsteps; ++step) {
       Real t = step * dt;
       stepper.do_step(t, dt, h, v);
     }
-    Real enf = shallow_water.compute_energy(h, v);
+
+    Real massf = shallow_water.mass_integral(h);
+    Real cirf = shallow_water.circulation_integral(v);
+    Real enf = shallow_water.energy_integral(h, v);
     
+    std::cout << "Mass change: " << (massf - mass0) / mass0 << std::endl;
+    std::cout << "Circulation change: " << (cirf - cir0) / cir0 << std::endl;
     std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
 }
 

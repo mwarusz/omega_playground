@@ -122,7 +122,38 @@ void ShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) const {
   });
 }
 
-Real ShallowWater::compute_energy(Real1d h, Real1d v) const {
+Real ShallowWater::mass_integral(Real1d h) const {
+  Real1d cell_mass("cell_mass", mesh->ncells);
+  
+  YAKL_SCOPE(area_cell, mesh->area_cell);
+
+  parallel_for("compute_cell_mass", mesh->ncells, YAKL_LAMBDA (Int icell) {
+      cell_mass(icell) = area_cell(icell) * h(icell);
+  });
+  return yakl::intrinsics::sum(cell_mass);
+}
+
+Real ShallowWater::circulation_integral(Real1d v) const {
+  Real1d cell_circulation("cell_circulation", mesh->nvertices);
+  
+  YAKL_SCOPE(dc_edge, mesh->dc_edge);
+  YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
+  YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
+  YAKL_SCOPE(area_triangle, mesh->area_triangle);
+  YAKL_SCOPE(f0, this->f0);
+
+  parallel_for("compute_cell_circulation", mesh->nvertices, YAKL_LAMBDA (Int ivertex) {
+      Real cir_i = -0;
+      for (Int j = 0; j < 3; ++j) {
+        Int jedge = edges_on_vertex(ivertex, j);
+        cir_i += dc_edge(jedge) * orient_on_vertex(ivertex, j) * v(jedge);
+      }
+      cell_circulation(ivertex) = cir_i + f0 * area_triangle(ivertex);
+  });
+  return yakl::intrinsics::sum(cell_circulation);
+}
+
+Real ShallowWater::energy_integral(Real1d h, Real1d v) const {
   Real1d cell_energy("cell_energy", mesh->ncells);
   
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -132,7 +163,7 @@ Real ShallowWater::compute_energy(Real1d h, Real1d v) const {
   YAKL_SCOPE(area_cell, mesh->area_cell);
   YAKL_SCOPE(grav, this->grav);
 
-  parallel_for("compute_energy", mesh->ncells, YAKL_LAMBDA (Int icell) {
+  parallel_for("compute_cell_energy", mesh->ncells, YAKL_LAMBDA (Int icell) {
       Real K = 0;
       for (Int j = 0; j < nedges_on_cell(icell); ++j) {
         Int jedge = edges_on_cell(icell, j);
@@ -198,7 +229,7 @@ void LinearShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) co
   });
 }
 
-Real LinearShallowWater::compute_energy(Real1d h, Real1d v) const {
+Real LinearShallowWater::energy_integral(Real1d h, Real1d v) const {
   Real1d cell_energy("cell_energy", mesh->ncells);
   
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -209,7 +240,7 @@ Real LinearShallowWater::compute_energy(Real1d h, Real1d v) const {
   YAKL_SCOPE(grav, this->grav);
   YAKL_SCOPE(h0, this->h0);
 
-  parallel_for("compute_energy", mesh->ncells, YAKL_LAMBDA (Int icell) {
+  parallel_for("compute_cell_energy", mesh->ncells, YAKL_LAMBDA (Int icell) {
       Real K = 0;
       for (Int j = 0; j < nedges_on_cell(icell); ++j) {
         Int jedge = edges_on_cell(icell, j);

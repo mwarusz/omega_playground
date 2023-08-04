@@ -104,13 +104,13 @@ Real run(Int n) {
         v(iedge) = nx * vx + ny * vy;
     });
 
-    Real en0 = shallow_water.compute_energy(h, v);
+    Real en0 = shallow_water.energy_integral(h, v);
     for (Int step = 0; step < numberofsteps; ++step) {
       //std::cout << step << " " << yakl::intrinsics::maxval(h) << " " << yakl::intrinsics::maxval(v) << std::endl;
       Real t = step * dt;
       stepper.do_step(t, dt, h, v);
     }
-    Real enf = shallow_water.compute_energy(h, v);
+    Real enf = shallow_water.energy_integral(h, v);
     std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
 
     parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
