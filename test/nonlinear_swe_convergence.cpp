@@ -11,7 +11,7 @@ static constexpr Real f0 = 0;
 static constexpr Real h0 = 1;
 
 YAKL_INLINE Real h_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  return eta0 * cos(kx * x + ky * y - omega * t);
+  return 10 + eta0 * cos(kx * x + ky * y - omega * t);
   //return h0;
 }
 
