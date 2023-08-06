@@ -4,6 +4,10 @@ project(omega_playground CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
+if ("${YAKL_ARCH}" STREQUAL "CUDA")
+  enable_language(CUDA)
+endif()
+
 include(FetchContent)
 FetchContent_Declare(yakl
   GIT_REPOSITORY https://github.com/mrnorman/YAKL.git

@@ -130,15 +130,21 @@ void run(Int nx, Real cfl) {
     Real cir0 = shallow_water.circulation_integral(v);
     Real en0 = shallow_water.energy_integral(h, v);
 
+    std::cout << "Initial h: " << yakl::intrinsics::minval(h) << " " << yakl::intrinsics::maxval(h) << std::endl;
+    std::cout << "Initial v: " << yakl::intrinsics::minval(v) << " " << yakl::intrinsics::maxval(v) << std::endl;
+
     for (Int step = 0; step < numberofsteps; ++step) {
       Real t = step * dt;
       stepper.do_step(t, dt, h, v);
     }
+    
+    std::cout << "Final h: " << yakl::intrinsics::minval(h) << " " << yakl::intrinsics::maxval(h) << std::endl;
+    std::cout << "Final v: " << yakl::intrinsics::minval(v) << " " << yakl::intrinsics::maxval(v) << std::endl;
 
     Real massf = shallow_water.mass_integral(h);
     Real cirf = shallow_water.circulation_integral(v);
     Real enf = shallow_water.energy_integral(h, v);
-    
+ 
     std::cout << "Mass change: " << (massf - mass0) / mass0 << std::endl;
     std::cout << "Circulation change: " << (cirf - cir0) / cir0 << std::endl;
     std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
