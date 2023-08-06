@@ -12,7 +12,7 @@ static constexpr Real h0 = 1000;
 struct ManufacturedShallowWater : ShallowWater {
   using ShallowWater::ShallowWater;
 
-  void additional_tendency(Real1d htend, Real1d vtend, Real1d h, Real1d v, Real t) const override {
+  void additional_tendency(Real1d htend, Real1d vtend, RealConst1d h, RealConst1d v, Real t) const override {
     using std::sin;
     using std::cos;
     

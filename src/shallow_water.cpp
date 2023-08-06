@@ -8,7 +8,7 @@ ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0) : mesh(&mesh), f0
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav) :
     mesh(&mesh), f0(f0), grav(grav) {}
 
-void ShallowWater::compute_h_tendency(Real1d htend, Real1d h, Real1d v) const {
+void ShallowWater::compute_h_tendency(Real1d htend, RealConst1d h, RealConst1d v) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
@@ -34,7 +34,7 @@ void ShallowWater::compute_h_tendency(Real1d htend, Real1d h, Real1d v) const {
   });
 }
 
-void ShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) const {
+void ShallowWater::compute_v_tendency(Real1d vtend, RealConst1d h, RealConst1d v) const {
   YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
   YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
   YAKL_SCOPE(kiteareas_on_vertex, mesh->kiteareas_on_vertex);
@@ -122,7 +122,7 @@ void ShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) const {
   });
 }
 
-Real ShallowWater::mass_integral(Real1d h) const {
+Real ShallowWater::mass_integral(RealConst1d h) const {
   Real1d cell_mass("cell_mass", mesh->ncells);
   
   YAKL_SCOPE(area_cell, mesh->area_cell);
@@ -133,7 +133,7 @@ Real ShallowWater::mass_integral(Real1d h) const {
   return yakl::intrinsics::sum(cell_mass);
 }
 
-Real ShallowWater::circulation_integral(Real1d v) const {
+Real ShallowWater::circulation_integral(RealConst1d v) const {
   Real1d cell_circulation("cell_circulation", mesh->nvertices);
   
   YAKL_SCOPE(dc_edge, mesh->dc_edge);
@@ -153,7 +153,7 @@ Real ShallowWater::circulation_integral(Real1d v) const {
   return yakl::intrinsics::sum(cell_circulation);
 }
 
-Real ShallowWater::energy_integral(Real1d h, Real1d v) const {
+Real ShallowWater::energy_integral(RealConst1d h, RealConst1d v) const {
   Real1d cell_energy("cell_energy", mesh->ncells);
   
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -185,7 +185,7 @@ LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real 
 LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0, Real grav) :
    ShallowWater(mesh, f0, grav), h0(h0) {}
 
-void LinearShallowWater::compute_h_tendency(Real1d htend, Real1d h, Real1d v) const {
+void LinearShallowWater::compute_h_tendency(Real1d htend, RealConst1d h, RealConst1d v) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
@@ -203,7 +203,7 @@ void LinearShallowWater::compute_h_tendency(Real1d htend, Real1d h, Real1d v) co
   });
 }
 
-void LinearShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) const {
+void LinearShallowWater::compute_v_tendency(Real1d vtend, RealConst1d h, RealConst1d v) const {
   YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
   YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
   YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
@@ -229,7 +229,7 @@ void LinearShallowWater::compute_v_tendency(Real1d vtend, Real1d h, Real1d v) co
   });
 }
 
-Real LinearShallowWater::energy_integral(Real1d h, Real1d v) const {
+Real LinearShallowWater::energy_integral(RealConst1d h, RealConst1d v) const {
   Real1d cell_energy("cell_energy", mesh->ncells);
   
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
