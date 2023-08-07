@@ -6,6 +6,7 @@ LSRKStepper::LSRKStepper(ShallowWater &shallow_water) :
   TimeStepper(shallow_water),
   rka(nstages),
   rkb(nstages),
+  rkc(nstages),
   htend("htend", shallow_water.mesh->ncells),
   vtend("vtend", shallow_water.mesh->nedges) {
 
