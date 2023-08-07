@@ -144,18 +144,32 @@ void run(Int nx, Real cfl) {
     Real massf = shallow_water.mass_integral(h);
     Real cirf = shallow_water.circulation_integral(v);
     Real enf = shallow_water.energy_integral(h, v);
+    
+    Real mass_change = (massf - mass0) / mass0;
+    Real cir_change = (cirf - cir0) / cir0;
+    Real en_change = (enf - en0) / en0;
  
-    std::cout << "Mass change: " << (massf - mass0) / mass0 << std::endl;
-    std::cout << "Circulation change: " << (cirf - cir0) / cir0 << std::endl;
-    std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
+    std::cout << "Mass change: " << mass_change << std::endl;
+    std::cout << "Circulation change: " << cir_change << std::endl;
+    std::cout << "Energy change: " << en_change << std::endl;
+
+    if (std::abs(mass_change) > 5e-15) {
+      throw std::runtime_error("Mass conservation check failed");
+    }
+    if (std::abs(cir_change) > 1e-15) {
+      throw std::runtime_error("Circulation conservation check failed");
+    }
+    if (std::abs(en_change) > 1e-10) {
+      throw std::runtime_error("Energy conservation check failed");
+    }
 }
 
 
 int main(int argc, char* argv[]) {
   yakl::init();
 
-  Int nx = 32;
-  Real cfl = 1;
+  Int nx = 25;
+  Real cfl = 0.1;
 
   if (argc > 1) {
     nx = std::stoi(argv[1]);

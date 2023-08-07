@@ -4,34 +4,80 @@
 
 using namespace omega;
 
-static constexpr Real eta0 = 1;
-static constexpr Real g0 = 10;
-static constexpr Real f0 = 1e-4;
-static constexpr Real h0 = 1000;
+bool check_rate(Real rate, Real expected_rate, Real atol) {
+  return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
+}
+
+struct ManufacturedSolution {
+
+  Real grav = 9.81;
+  Real f0 = 1e-4;
+  Real lx = 1000;
+  Real ly = std::sqrt(3) / 2 * lx;
+  Real eta0 = 1;
+  Real h0 = 1000;
+  Int mx = 2;
+  Int my = 2;
+  Real kx = mx * (2 * pi / lx);
+  Real ky = my * (2 * pi / ly);
+  Real omega = std::sqrt(f0 * f0 + grav * h0 * (kx * kx + ky * ky));
+
+  YAKL_INLINE Real h(Real x, Real y, Real t) const {
+    return h0 + eta0 * std::sin(kx * x + ky * y - omega * t);
+  }
+
+  YAKL_INLINE Real vx(Real x, Real y, Real t) const {
+    return eta0 * std::cos(kx * x + ky * y - omega * t);
+  }
+
+  YAKL_INLINE Real vy(Real x, Real y, Real t) const {
+    return eta0 * std::cos(kx * x + ky * y - omega * t);
+  }
+  
+  YAKL_INLINE Real htend(Real x, Real y, Real t) const {
+    using std::sin;
+    using std::cos;
+
+    Real phi = kx * x + ky * y - omega * t;
+    return eta0 * (-h0 * (kx + ky) * sin(phi) - omega * cos(phi) + eta0 * (kx + ky) * cos(2 * phi));
+  }
+
+  YAKL_INLINE Real vxtend(Real x, Real y, Real t) const {
+    using std::sin;
+    using std::cos;
+
+    Real phi = kx * x + ky * y - omega * t;
+    return eta0 * ((-f0 + grav * kx) * cos(phi) + omega * sin(phi) - eta0 * (kx + ky) * sin(2 * phi) / 2);
+  }
+
+  YAKL_INLINE Real vytend(Real x, Real y, Real t) const {
+    using std::sin;
+    using std::cos;
+
+    Real phi = kx * x + ky * y - omega * t;
+    return eta0 * ((f0 + grav * ky) * cos(phi) + omega * sin(phi) - eta0 * (kx + ky) * sin(2 * phi) / 2);
+  }
+};
 
 struct ManufacturedShallowWater : ShallowWater {
-  using ShallowWater::ShallowWater;
+  ManufacturedSolution manufactured_solution;
+
+  ManufacturedShallowWater(PlanarHexagonalMesh &mesh, const ManufacturedSolution &manufactured_solution) :
+    ShallowWater(mesh, manufactured_solution.f0, manufactured_solution.grav),
+    manufactured_solution(manufactured_solution) {}
 
   void additional_tendency(Real1d htend, Real1d vtend, RealConst1d h, RealConst1d v, Real t) const override {
     using std::sin;
     using std::cos;
-    
-    Real lx = 1000;
-    Real ly = std::sqrt(3) / 2 * lx;
-    Real kx = 2 * (2 * pi / lx);
-    Real ky = 2 * (2 * pi / ly);
-    Real omega = std::sqrt(f0 * f0 + g0 * h0 * (kx * kx + ky * ky));
 
+    YAKL_SCOPE(manufactured_solution, this->manufactured_solution);
 
     YAKL_SCOPE(x_cell, mesh->x_cell);
     YAKL_SCOPE(y_cell, mesh->y_cell);
     parallel_for("manufactured_htend", mesh->ncells, YAKL_LAMBDA (Int icell) {
         Real x = x_cell(icell);
         Real y = y_cell(icell);
-
-        Real phi = kx * x + ky * y - omega * t;
-
-        htend(icell) += eta0 * (-h0 * (kx + ky) * sin(phi) - omega * cos(phi) + eta0 * (kx + ky) * cos(2 * phi));
+        htend(icell) += manufactured_solution.htend(x, y, t);
     });
     
     YAKL_SCOPE(x_edge, mesh->x_edge);
@@ -41,45 +87,26 @@ struct ManufacturedShallowWater : ShallowWater {
         Real x = x_edge(iedge);
         Real y = y_edge(iedge);
         
-        Real phi = kx * x + ky * y - omega * t;
+        Real nx = std::cos(angle_edge(iedge));
+        Real ny = std::sin(angle_edge(iedge));
         
-        Real nx = cos(angle_edge(iedge));
-        Real ny = sin(angle_edge(iedge));
+        Real vxtend = manufactured_solution.vxtend(x, y, t); 
+        Real vytend = manufactured_solution.vytend(x, y, t); 
         
-        Real vtendx = eta0 * ((-f0 + grav * kx) * cos(phi) + omega * sin(phi) - eta0 * (kx + ky) * sin(2 * phi) / 2);
-        Real vtendy = eta0 * ((f0 + grav * ky) * cos(phi) + omega * sin(phi) - eta0 * (kx + ky) * sin(2 * phi) / 2);
-        
-        vtend(iedge) += nx * vtendx + ny * vtendy;
+        vtend(iedge) += nx * vxtend + ny * vytend;
     });
   }
 };
 
-YAKL_INLINE Real h_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  return h0 + eta0 * std::sin(kx * x + ky * y - omega * t);
-}
-
-YAKL_INLINE Real vx_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  return eta0 * std::cos(kx * x + ky * y - omega * t);
-}
-
-YAKL_INLINE Real vy_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  return eta0 * std::cos(kx * x + ky * y - omega * t);
-}
-
 Real run(Int n) {
-    Real lx = 1000;
-    Real ly = std::sqrt(3) / 2 * lx;
-    Real kx = 2 * (2 * pi / lx);
-    Real ky = 2 * (2 * pi / ly);
-    Real omega = std::sqrt(f0 * f0 + g0 * h0 * (kx * kx + ky * ky));
-
-    PlanarHexagonalMesh mesh(n, n, lx / n);
-    ManufacturedShallowWater shallow_water(mesh, f0, g0);
+    ManufacturedSolution manufactured_solution;
+    PlanarHexagonalMesh mesh(n, n, manufactured_solution.lx / n);
+    ManufacturedShallowWater shallow_water(mesh, manufactured_solution);
     LSRKStepper stepper(shallow_water);
     
     Real timeend = 1;
     Real cfl = 0.3;
-    Real dt = cfl * mesh.dc / std::sqrt(g0 * h0);
+    Real dt = cfl * mesh.dc / std::sqrt(shallow_water.grav * manufactured_solution.h0);
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
     
@@ -90,8 +117,8 @@ Real run(Int n) {
     parallel_for("init_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell) = h_exact(x, y, 0, kx, ky, omega);
-        hexact(icell) = h_exact(x, y, timeend, kx, ky, omega);
+        h(icell) = manufactured_solution.h(x, y, 0);
+        hexact(icell) = manufactured_solution.h(x, y, timeend);
     });
     
     parallel_for("init_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
@@ -99,19 +126,15 @@ Real run(Int n) {
         Real y = mesh.y_edge(iedge);
         Real nx = std::cos(mesh.angle_edge(iedge));
         Real ny = std::sin(mesh.angle_edge(iedge));
-        Real vx = vx_exact(x, y, 0, kx, ky, omega);
-        Real vy = vy_exact(x, y, 0, kx, ky, omega);
+        Real vx = manufactured_solution.vx(x, y, 0);
+        Real vy = manufactured_solution.vy(x, y, 0);
         v(iedge) = nx * vx + ny * vy;
     });
 
-    Real en0 = shallow_water.energy_integral(h, v);
     for (Int step = 0; step < numberofsteps; ++step) {
-      //std::cout << step << " " << yakl::intrinsics::maxval(h) << " " << yakl::intrinsics::maxval(v) << std::endl;
       Real t = step * dt;
       stepper.do_step(t, dt, h, v);
     }
-    Real enf = shallow_water.energy_integral(h, v);
-    std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
 
     parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
         hexact(icell) -= h(icell);
@@ -127,20 +150,26 @@ int main() {
 
   Int nlevels = 3;
   std::vector<Real> err(nlevels);
-  Int n = 16;
+  Int nx = 16;
   
   for (Int l = 0; l < nlevels; ++l) {
-    err[l] = run(n);
-    n *= 2;
+    err[l] = run(nx);
+    nx *= 2;
   }
 
+  std::vector<Real> rate(nlevels - 1);
   std::cout << "Manufactured solution convergence" << std::endl;
   for (Int l = 0; l < nlevels; ++l) {
     std::cout << l << " " << err[l];
     if (l > 0) {
-      std::cout << " " << std::log2(err[l-1] / err[l]);
+      rate[l - 1] = std::log2(err[l-1] / err[l]); 
+      std::cout << " " << rate[l - 1];
     }
     std::cout << std::endl;
+  }
+
+  if (!check_rate(rate.back(), 2, 0.05)) {
+    throw std::runtime_error("Manufactured solution is not converging at the right rate");
   }
 
   yakl::finalize();

@@ -4,39 +4,50 @@
 
 using namespace omega;
 
-static constexpr Real h0 = 1000;
-static constexpr Real eta0 = 1;
-static constexpr Real g0 = 10;
-static constexpr Real f0 = 1e-4;
-
-YAKL_INLINE Real h_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  return eta0 * cos(kx * x + ky * y - omega * t);
+bool check_rate(Real rate, Real expected_rate, Real atol) {
+  return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
 }
 
-YAKL_INLINE Real vx_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  Real a = kx * x + ky * y - omega * t;
-  return eta0 * g0 / (omega * omega - f0 * f0) * (omega * kx * std::cos(a) - f0 * ky * std::sin(a)) ;
-}
+struct InertiaGravityWave {
+  Real h0 = 1000;
+  Real eta0 = 1;
+  Real grav = 9.81;
+  Real f0 = 1e-4;
+  Real lx = 1000;
+  Real ly = std::sqrt(3) / 2 * lx;
+  Int mx = 2;
+  Int my = 2;
+  Real kx = mx * (2 * pi / lx);
+  Real ky = my * (2 * pi / ly);
+  Real omega = std::sqrt(f0 * f0 + grav * h0 * (kx * kx + ky * ky));
 
-YAKL_INLINE Real vy_exact(Real x, Real y, Real t, Real kx, Real ky, Real omega) {
-  Real a = kx * x + ky * y - omega * t;
-  return eta0 * g0 / (omega * omega - f0 * f0) * (omega * ky * std::cos(a) + f0 * kx * std::sin(a)) ;
-}
+  YAKL_INLINE Real h(Real x, Real y, Real t) const {
+    return eta0 * std::cos(kx * x + ky * y - omega * t);
+  }
 
-Real run(Int n) {
-    Real lx = 1000;
-    Real ly = std::sqrt(3) / 2 * lx;
-    Real kx = 2 * (2 * pi / lx);
-    Real ky = 2 * (2 * pi / ly);
-    Real omega = std::sqrt(f0 * f0 + g0 * h0 * (kx * kx + ky * ky));
+  YAKL_INLINE Real vx(Real x, Real y, Real t) const {
+    Real a = kx * x + ky * y - omega * t;
+    return eta0 * grav / (omega * omega - f0 * f0) * (omega * kx * std::cos(a) - f0 * ky * std::sin(a)) ;
+  }
 
-    PlanarHexagonalMesh mesh(n, n, lx / n);
-    LinearShallowWater shallow_water(mesh, h0, f0, g0);
+  YAKL_INLINE Real vy(Real x, Real y, Real t) const {
+    Real a = kx * x + ky * y - omega * t;
+    return eta0 * grav / (omega * omega - f0 * f0) * (omega * ky * std::cos(a) + f0 * kx * std::sin(a)) ;
+  }
+};
+
+Real run(Int nx) {
+    InertiaGravityWave inertia_gravity_wave;
+
+    PlanarHexagonalMesh mesh(nx, nx, inertia_gravity_wave.lx / nx);
+    LinearShallowWater shallow_water(mesh, inertia_gravity_wave.h0,
+                                           inertia_gravity_wave.f0,
+                                           inertia_gravity_wave.grav);
     LSRKStepper stepper(shallow_water);
     
     Real timeend = 20;
-    Real cfl = 0.01;
-    Real dt = cfl * mesh.dc / std::sqrt(g0 * h0);
+    Real cfl = 1.0;
+    Real dt = cfl * mesh.dc / std::sqrt(shallow_water.grav * shallow_water.h0);
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
     
@@ -47,8 +58,8 @@ Real run(Int n) {
     parallel_for("init_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell) = h_exact(x, y, 0, kx, ky, omega);
-        hexact(icell) = h_exact(x, y, timeend, kx, ky, omega);
+        h(icell) = inertia_gravity_wave.h(x, y, 0);
+        hexact(icell) = inertia_gravity_wave.h(x, y, timeend);
     });
     
     parallel_for("init_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
@@ -56,19 +67,15 @@ Real run(Int n) {
         Real y = mesh.y_edge(iedge);
         Real nx = std::cos(mesh.angle_edge(iedge));
         Real ny = std::sin(mesh.angle_edge(iedge));
-        Real vx = vx_exact(x, y, 0, kx, ky, omega);
-        Real vy = vy_exact(x, y, 0, kx, ky, omega);
+        Real vx = inertia_gravity_wave.vx(x, y, 0);
+        Real vy = inertia_gravity_wave.vy(x, y, 0);
         v(iedge) = nx * vx + ny * vy;
     });
 
-    Real en0 = shallow_water.energy_integral(h, v);
     for (Int step = 0; step < numberofsteps; ++step) {
       Real t = step * dt;
       stepper.do_step(t, dt, h, v);
     }
-    Real enf = shallow_water.energy_integral(h, v);
-
-    std::cout << "Energy change: " << (enf - en0) / en0 << std::endl;
 
     parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
         hexact(icell) -= h(icell);
@@ -82,22 +89,28 @@ Real run(Int n) {
 int main() {
   yakl::init();
 
-  Int nlevels = 1;
-  std::vector<Real> err(nlevels);
-  Int n = 16;
+  Int nlevels = 3;
+  Int nx = 16;
   
+  std::vector<Real> err(nlevels);
   for (Int l = 0; l < nlevels; ++l) {
-    err[l] = run(n);
-    n *= 2;
+    err[l] = run(nx);
+    nx *= 2;
   }
 
+  std::vector<Real> rate(nlevels - 1);
   std::cout << "Inertia gravity wave convergence" << std::endl;
   for (Int l = 0; l < nlevels; ++l) {
     std::cout << l << " " << err[l];
     if (l > 0) {
-      std::cout << " " << std::log2(err[l-1] / err[l]);
+      rate[l - 1] = std::log2(err[l-1] / err[l]); 
+      std::cout << " " << rate[l - 1];
     }
     std::cout << std::endl;
+  }
+
+  if (!check_rate(rate.back(), 2, 0.05)) {
+    throw std::runtime_error("Inertia-gravity wave is not converging at the right rate");
   }
 
   yakl::finalize();
