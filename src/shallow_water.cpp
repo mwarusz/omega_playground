@@ -115,10 +115,8 @@ void ShallowWater::compute_v_tendency(Real1d vtend, RealConst1d h, RealConst1d v
       K1 /= area_cell(icell1);
 
       Real grad_B = (K1 - K0 + grav * (h(icell1) - h(icell0))) / dc_edge(iedge);
-      //Real grad_B = (grav * (h(icell1) - h(icell0))) / dc_edge(iedge);
 
       vtend(iedge) += qt - grad_B;
-      //vtend(iedge) += -grad_B;
   });
 }
 

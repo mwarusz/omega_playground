@@ -289,20 +289,6 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
 
       for (Int j = 0; j < 3; ++j) {
         orient_on_vertex(ivertex, j) = vertices_on_edge(edges_on_vertex(ivertex, j), 0) == ivertex ? -1 : 1;
-
-        //Int iedge = edges_on_vertex(ivertex, j);
-        //Int icell0 = cells_on_edge(iedge, 0);
-        //Int icell1 = cells_on_edge(iedge, 1);
-        //
-        //if (cells_on_vertex(ivertex, 0) == icell0 && cells_on_vertex(ivertex, 1) == icell1) {
-        //  orient_on_vertex(ivertex, j) = 1;
-        //} else if (cells_on_vertex(ivertex, 1) == icell0 && cells_on_vertex(ivertex, 2) == icell1) {
-        //  orient_on_vertex(ivertex, j) = 1;
-        //} else if (cells_on_vertex(ivertex, 2) == icell0 && cells_on_vertex(ivertex, 0) == icell1) {
-        //  orient_on_vertex(ivertex, j) = 1;
-        //} else {
-        //  orient_on_vertex(ivertex, j) = -1;
-        //}
       }
   });
 }
