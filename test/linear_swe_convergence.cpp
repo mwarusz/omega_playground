@@ -13,7 +13,7 @@ struct InertiaGravityWave {
   Real eta0 = 1;
   Real grav = 9.81;
   Real f0 = 1e-4;
-  Real lx = 1000;
+  Real lx = 10000 * 1e3;
   Real ly = std::sqrt(3) / 2 * lx;
   Int mx = 2;
   Int my = 2;
@@ -45,7 +45,7 @@ Real run(Int nx) {
                                            inertia_gravity_wave.grav);
     LSRKStepper stepper(shallow_water);
     
-    Real timeend = 20;
+    Real timeend = 10 * 60 * 60;
     Real cfl = 1.0;
     Real dt = cfl * mesh.dc / std::sqrt(shallow_water.grav * shallow_water.h0);
     Int numberofsteps = std::ceil(timeend / dt);

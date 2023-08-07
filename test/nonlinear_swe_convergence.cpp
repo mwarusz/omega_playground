@@ -12,7 +12,7 @@ struct ManufacturedSolution {
 
   Real grav = 9.81;
   Real f0 = 1e-4;
-  Real lx = 1000;
+  Real lx = 10000 * 1e3;
   Real ly = std::sqrt(3) / 2 * lx;
   Real eta0 = 1;
   Real h0 = 1000;
@@ -104,8 +104,8 @@ Real run(Int n) {
     ManufacturedShallowWater shallow_water(mesh, manufactured_solution);
     LSRKStepper stepper(shallow_water);
     
-    Real timeend = 1;
-    Real cfl = 0.3;
+    Real timeend = 10 * 60 * 60;
+    Real cfl = 1.0;
     Real dt = cfl * mesh.dc / std::sqrt(shallow_water.grav * manufactured_solution.h0);
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
