@@ -2,8 +2,12 @@
 
 namespace omega {
 
-PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny) : PlanarHexagonalMesh(nx, ny, 1. / nx) {}
-PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc) : nx(nx), ny(ny), dc(dc) {
+PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Int nlayers) :
+  PlanarHexagonalMesh(nx, ny, 1. / nx, nlayers) {}
+
+PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers) :
+  nx(nx), ny(ny), dc(dc), nlayers(nlayers) {
+
   this->ncells = nx * ny;
   this->nedges = 3 * ncells;
   this->nvertices = 2 * ncells;
@@ -12,6 +16,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc) : nx(nx), ny(n
 
   // cell properties
   this->nedges_on_cell = Int1d("nedges_on_cell", ncells);
+  this->max_level_cell = Int1d("max_level_cell", ncells);
   this->cells_on_cell = Int2d("cells_on_cell", ncells, maxedges);
   this->edges_on_cell = Int2d("edges_on_cell", ncells, maxedges);
   this->vertices_on_cell = Int2d("vertices_on_cell", ncells, maxedges);
@@ -27,6 +32,8 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc) : nx(nx), ny(n
 
   // edge properties
   this->nedges_on_edge = Int1d("nedges_on_edge", nedges);
+  this->max_level_edge_bot = Int1d("max_level_edge_bot", nedges);
+  this->max_level_edge_top = Int1d("max_level_edge_top", nedges);
   this->cells_on_edge = Int2d("cells_on_edge", nedges, 2);
   this->vertices_on_edge = Int2d("vertices_on_edge", nedges, 2);
   this->edges_on_edge = Int2d("edges_on_edge", nedges, 2 * maxedges);
@@ -42,6 +49,8 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc) : nx(nx), ny(n
   this->weights_on_edge = Real2d("weights_on_edge", nedges, 2 * maxedges);
   
   // vertex properties
+  this->max_level_vertex_bot = Int1d("max_level_vertex_bot", nvertices);
+  this->max_level_vertex_top = Int1d("max_level_vertex_top", nvertices);
   this->edges_on_vertex = Int2d("edges_on_vertex", nvertices, 3);
   this->cells_on_vertex = Int2d("cells_on_vertex", nvertices, 3);
   this->orient_on_vertex = Int2d("orient_on_vertex", nvertices, 3);
@@ -291,5 +300,11 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         orient_on_vertex(ivertex, j) = vertices_on_edge(edges_on_vertex(ivertex, j), 0) == ivertex ? -1 : 1;
       }
   });
+
+  yakl::memset(max_level_cell, nlayers);
+  yakl::memset(max_level_edge_bot, nlayers);
+  yakl::memset(max_level_edge_top, nlayers);
+  yakl::memset(max_level_vertex_bot, nlayers);
+  yakl::memset(max_level_vertex_top, nlayers);
 }
 }

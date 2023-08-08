@@ -39,7 +39,7 @@ struct InertiaGravityWave {
 Real run(Int nx) {
     InertiaGravityWave inertia_gravity_wave;
 
-    PlanarHexagonalMesh mesh(nx, nx, inertia_gravity_wave.lx / nx);
+    PlanarHexagonalMesh mesh(nx, nx, inertia_gravity_wave.lx / nx, 1);
     LinearShallowWater shallow_water(mesh, inertia_gravity_wave.h0,
                                            inertia_gravity_wave.f0,
                                            inertia_gravity_wave.grav);
@@ -51,25 +51,25 @@ Real run(Int nx) {
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
     
-    Real1d h("h", mesh.ncells);
-    Real1d hexact("hexact", mesh.ncells);
-    Real1d v("v", mesh.nedges);
+    Real2d h("h", mesh.ncells, mesh.nlayers);
+    Real2d hexact("hexact", mesh.ncells, mesh.nlayers);
+    Real2d v("v", mesh.nedges, mesh.nlayers);
   
-    parallel_for("init_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
+    parallel_for("init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers), YAKL_LAMBDA (Int icell, Int k) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell) = inertia_gravity_wave.h(x, y, 0);
-        hexact(icell) = inertia_gravity_wave.h(x, y, timeend);
+        h(icell, k) = inertia_gravity_wave.h(x, y, 0);
+        hexact(icell, k) = inertia_gravity_wave.h(x, y, timeend);
     });
     
-    parallel_for("init_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
+    parallel_for("init_v", SimpleBounds<2>(mesh.nedges, mesh.nlayers), YAKL_LAMBDA (Int iedge, Int k) {
         Real x = mesh.x_edge(iedge);
         Real y = mesh.y_edge(iedge);
         Real nx = std::cos(mesh.angle_edge(iedge));
         Real ny = std::sin(mesh.angle_edge(iedge));
         Real vx = inertia_gravity_wave.vx(x, y, 0);
         Real vy = inertia_gravity_wave.vy(x, y, 0);
-        v(iedge) = nx * vx + ny * vy;
+        v(iedge, k) = nx * vx + ny * vy;
     });
 
     for (Int step = 0; step < numberofsteps; ++step) {
@@ -77,9 +77,9 @@ Real run(Int nx) {
       stepper.do_step(t, dt, h, v);
     }
 
-    parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
-        hexact(icell) -= h(icell);
-        hexact(icell) = std::abs(hexact(icell));
+    parallel_for("compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers), YAKL_LAMBDA (Int icell, Int k) {
+        hexact(icell, k) -= h(icell, k);
+        hexact(icell, k) = std::abs(hexact(icell, k));
     });
     
     return yakl::intrinsics::maxval(hexact);

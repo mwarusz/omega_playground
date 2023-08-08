@@ -107,23 +107,23 @@ void run(Int nx, Real cfl) {
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
     
-    Real1d h("h", mesh.ncells);
-    Real1d v("v", mesh.nedges);
+    Real2d h("h", mesh.ncells, mesh.nlayers);
+    Real2d v("v", mesh.nedges, mesh.nlayers);
   
-    parallel_for("init_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
+    parallel_for("init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers), YAKL_LAMBDA (Int icell, Int k) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell) = double_vortex.h(x, y);
+        h(icell, k) = double_vortex.h(x, y);
     });
     
-    parallel_for("init_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
+    parallel_for("init_v", SimpleBounds<2>(mesh.nedges, mesh.nlayers), YAKL_LAMBDA (Int iedge, Int k) {
         Real x = mesh.x_edge(iedge);
         Real y = mesh.y_edge(iedge);
         Real nx = std::cos(mesh.angle_edge(iedge));
         Real ny = std::sin(mesh.angle_edge(iedge));
         Real vx = double_vortex.vx(x, y);
         Real vy = double_vortex.vy(x, y);
-        v(iedge) = nx * vx + ny * vy;
+        v(iedge, k) = nx * vx + ny * vy;
     });
 
     Real mass0 = shallow_water.mass_integral(h);

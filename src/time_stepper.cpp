@@ -7,8 +7,8 @@ LSRKStepper::LSRKStepper(ShallowWaterBase &shallow_water) :
   rka(nstages),
   rkb(nstages),
   rkc(nstages),
-  htend("htend", shallow_water.mesh->ncells),
-  vtend("vtend", shallow_water.mesh->nedges) {
+  htend("htend", shallow_water.mesh->ncells, shallow_water.mesh->nlayers),
+  vtend("vtend", shallow_water.mesh->nedges, shallow_water.mesh->nlayers) {
 
   yakl::memset(htend, 0);
   yakl::memset(vtend, 0);
@@ -30,7 +30,7 @@ LSRKStepper::LSRKStepper(ShallowWaterBase &shallow_water) :
   };
 }
 
-void LSRKStepper::do_step(Real t, Real dt, Real1d h, Real1d v) const {
+void LSRKStepper::do_step(Real t, Real dt, Real2d h, Real2d v) const {
   auto mesh = shallow_water->mesh;
 
   YAKL_SCOPE(htend, this->htend);
@@ -38,22 +38,22 @@ void LSRKStepper::do_step(Real t, Real dt, Real1d h, Real1d v) const {
 
   for (Int stage = 0; stage < nstages; ++stage) {
     Real rka_stage = rka[stage];
-    parallel_for("lsrk1_h", mesh->ncells, YAKL_LAMBDA (Int icell) {
-        htend(icell) *= rka_stage;
+    parallel_for("lsrk1_h", SimpleBounds<2>(mesh->ncells, mesh->nlayers), YAKL_LAMBDA (Int icell, Int k) {
+        htend(icell, k) *= rka_stage;
     });
-    parallel_for("lsrk1_v", mesh->nedges, YAKL_LAMBDA (Int iedge) {
-        vtend(iedge) *= rka_stage;
+    parallel_for("lsrk1_v", SimpleBounds<2>(mesh->nedges, mesh->nlayers), YAKL_LAMBDA (Int iedge, Int k) {
+        vtend(iedge, k) *= rka_stage;
     });
 
     Real stagetime = t + rkc[stage] * dt;
     shallow_water->compute_tendency(htend, vtend, h, v, stagetime);
     
     Real rkb_stage = rkb[stage];
-    parallel_for("lsrk2_h", mesh->ncells, YAKL_LAMBDA (Int icell) {
-        h(icell) += dt * rkb_stage * htend(icell);
+    parallel_for("lsrk2_h", SimpleBounds<2>(mesh->ncells, mesh->nlayers), YAKL_LAMBDA (Int icell, Int k) {
+        h(icell, k) += dt * rkb_stage * htend(icell, k);
     });
-    parallel_for("lsrk2_v", mesh->nedges, YAKL_LAMBDA (Int iedge) {
-        v(iedge) += dt * rkb_stage * vtend(iedge);
+    parallel_for("lsrk2_v", SimpleBounds<2>(mesh->nedges, mesh->nlayers), YAKL_LAMBDA (Int iedge, Int k) {
+        v(iedge, k) += dt * rkb_stage * vtend(iedge, k);
     });
   }
 }

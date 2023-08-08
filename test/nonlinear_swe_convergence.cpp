@@ -66,7 +66,7 @@ struct ManufacturedShallowWater : ShallowWater {
     ShallowWater(mesh, manufactured_solution.f0, manufactured_solution.grav),
     manufactured_solution(manufactured_solution) {}
 
-  void additional_tendency(Real1d htend, Real1d vtend, RealConst1d h, RealConst1d v, Real t) const override {
+  void additional_tendency(Real2d htend, Real2d vtend, RealConst2d h, RealConst2d v, Real t) const override {
     using std::sin;
     using std::cos;
 
@@ -74,16 +74,21 @@ struct ManufacturedShallowWater : ShallowWater {
 
     YAKL_SCOPE(x_cell, mesh->x_cell);
     YAKL_SCOPE(y_cell, mesh->y_cell);
+    YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
     parallel_for("manufactured_htend", mesh->ncells, YAKL_LAMBDA (Int icell) {
+      for (Int k = 0; k < max_level_cell(icell); ++k) {
         Real x = x_cell(icell);
         Real y = y_cell(icell);
-        htend(icell) += manufactured_solution.htend(x, y, t);
+        htend(icell, k) += manufactured_solution.htend(x, y, t);
+      }
     });
     
     YAKL_SCOPE(x_edge, mesh->x_edge);
     YAKL_SCOPE(y_edge, mesh->y_edge);
     YAKL_SCOPE(angle_edge, mesh->angle_edge);
+    YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
     parallel_for("manufactured_vtend", mesh->nedges, YAKL_LAMBDA (Int iedge) {
+      for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
         Real x = x_edge(iedge);
         Real y = y_edge(iedge);
         
@@ -93,7 +98,8 @@ struct ManufacturedShallowWater : ShallowWater {
         Real vxtend = manufactured_solution.vxtend(x, y, t); 
         Real vytend = manufactured_solution.vytend(x, y, t); 
         
-        vtend(iedge) += nx * vxtend + ny * vytend;
+        vtend(iedge, k) += nx * vxtend + ny * vytend;
+      }
     });
   }
 };
@@ -110,25 +116,25 @@ Real run(Int n) {
     Int numberofsteps = std::ceil(timeend / dt);
     dt = timeend / numberofsteps;
     
-    Real1d h("h", mesh.ncells);
-    Real1d hexact("hexact", mesh.ncells);
-    Real1d v("v", mesh.nedges);
+    Real2d h("h", mesh.ncells, mesh.nlayers);
+    Real2d hexact("hexact", mesh.ncells, mesh.nlayers);
+    Real2d v("v", mesh.nedges, mesh.nlayers);
   
-    parallel_for("init_h", mesh.ncells, YAKL_LAMBDA (Int icell) {
+    parallel_for("init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers), YAKL_LAMBDA (Int icell, Int k) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell) = manufactured_solution.h(x, y, 0);
-        hexact(icell) = manufactured_solution.h(x, y, timeend);
+        h(icell, k) = manufactured_solution.h(x, y, 0);
+        hexact(icell, k) = manufactured_solution.h(x, y, timeend);
     });
     
-    parallel_for("init_v", mesh.nedges, YAKL_LAMBDA (Int iedge) {
+    parallel_for("init_v", SimpleBounds<2>(mesh.nedges, mesh.nlayers), YAKL_LAMBDA (Int iedge, Int k) {
         Real x = mesh.x_edge(iedge);
         Real y = mesh.y_edge(iedge);
         Real nx = std::cos(mesh.angle_edge(iedge));
         Real ny = std::sin(mesh.angle_edge(iedge));
         Real vx = manufactured_solution.vx(x, y, 0);
         Real vy = manufactured_solution.vy(x, y, 0);
-        v(iedge) = nx * vx + ny * vy;
+        v(iedge, k) = nx * vx + ny * vy;
     });
 
     for (Int step = 0; step < numberofsteps; ++step) {
@@ -136,9 +142,9 @@ Real run(Int n) {
       stepper.do_step(t, dt, h, v);
     }
 
-    parallel_for("compute_error", mesh.ncells, YAKL_LAMBDA (Int icell) {
-        hexact(icell) -= h(icell);
-        hexact(icell) = std::abs(hexact(icell));
+    parallel_for("compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers), YAKL_LAMBDA (Int icell, Int k) {
+        hexact(icell, k) -= h(icell, k);
+        hexact(icell, k) = std::abs(hexact(icell, k));
     });
     
     return yakl::intrinsics::maxval(hexact);
