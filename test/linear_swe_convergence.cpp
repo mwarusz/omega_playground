@@ -98,19 +98,21 @@ int main() {
     nx *= 2;
   }
 
-  std::vector<Real> rate(nlevels - 1);
-  std::cout << "Inertia gravity wave convergence" << std::endl;
-  for (Int l = 0; l < nlevels; ++l) {
-    std::cout << l << " " << err[l];
-    if (l > 0) {
-      rate[l - 1] = std::log2(err[l-1] / err[l]); 
-      std::cout << " " << rate[l - 1];
+  if (nlevels > 1) { 
+    std::vector<Real> rate(nlevels - 1);
+    std::cout << "Inertia gravity wave convergence" << std::endl;
+    for (Int l = 0; l < nlevels; ++l) {
+      std::cout << l << " " << err[l];
+      if (l > 0) {
+        rate[l - 1] = std::log2(err[l-1] / err[l]); 
+        std::cout << " " << rate[l - 1];
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
-  }
 
-  if (!check_rate(rate.back(), 2, 0.05)) {
-    throw std::runtime_error("Inertia-gravity wave is not converging at the right rate");
+    if (!check_rate(rate.back(), 2, 0.05)) {
+      throw std::runtime_error("Inertia-gravity wave is not converging at the right rate");
+    }
   }
 
   yakl::finalize();
