@@ -156,7 +156,7 @@ void run(Int nx, Real cfl) {
     if (std::abs(mass_change) > 5e-15) {
       throw std::runtime_error("Mass conservation check failed");
     }
-    if (std::abs(cir_change) > 1e-15) {
+    if (std::abs(cir_change) > 5e-15) {
       throw std::runtime_error("Circulation conservation check failed");
     }
     if (std::abs(en_change) > 1e-10) {

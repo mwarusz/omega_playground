@@ -2,11 +2,49 @@
 
 namespace omega {
 
+// Base
+
+ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0) : mesh(&mesh), f0(f0) {}
+ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0, Real grav) :
+    mesh(&mesh), f0(f0), grav(grav) {}
+
+Real ShallowWaterBase::mass_integral(RealConst1d h) const {
+  Real1d cell_mass("cell_mass", mesh->ncells);
+  
+  YAKL_SCOPE(area_cell, mesh->area_cell);
+
+  parallel_for("compute_cell_mass", mesh->ncells, YAKL_LAMBDA (Int icell) {
+      cell_mass(icell) = area_cell(icell) * h(icell);
+  });
+  return yakl::intrinsics::sum(cell_mass);
+}
+
+Real ShallowWaterBase::circulation_integral(RealConst1d v) const {
+  Real1d cell_circulation("cell_circulation", mesh->nvertices);
+  
+  YAKL_SCOPE(dc_edge, mesh->dc_edge);
+  YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
+  YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
+  YAKL_SCOPE(area_triangle, mesh->area_triangle);
+  YAKL_SCOPE(f0, this->f0);
+
+  parallel_for("compute_cell_circulation", mesh->nvertices, YAKL_LAMBDA (Int ivertex) {
+      Real cir_i = -0;
+      for (Int j = 0; j < 3; ++j) {
+        Int jedge = edges_on_vertex(ivertex, j);
+        cir_i += dc_edge(jedge) * orient_on_vertex(ivertex, j) * v(jedge);
+      }
+      cell_circulation(ivertex) = cir_i + f0 * area_triangle(ivertex);
+  });
+  return yakl::intrinsics::sum(cell_circulation);
+}
+
 // Nonlinear
 
-ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0) : mesh(&mesh), f0(f0) {}
+ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0) :
+  ShallowWaterBase(mesh, f0), hflux("hflux", mesh.nedges) {}
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav) :
-    mesh(&mesh), f0(f0), grav(grav) {}
+  ShallowWaterBase(mesh, f0, grav), hflux("hflux", mesh.nedges) {}
 
 void ShallowWater::compute_h_tendency(Real1d htend, RealConst1d h, RealConst1d v) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -15,20 +53,23 @@ void ShallowWater::compute_h_tendency(Real1d htend, RealConst1d h, RealConst1d v
   YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
   YAKL_SCOPE(orient_on_cell, mesh->orient_on_cell);
   YAKL_SCOPE(area_cell, mesh->area_cell);
+  
+  YAKL_SCOPE(hflux, this->hflux);
+  parallel_for("compute_hflux", mesh->nedges, YAKL_LAMBDA (Int iedge) {
+      Real he = -0;
+      for (Int j = 0; j < 2; ++j) {
+        Int jcell = cells_on_edge(iedge, j);
+        he += h(jcell);
+      }
+      he /= 2;
+      hflux(iedge) = he * v(iedge);
+  });
 
-  parallel_for("compute_h_tendency", mesh->ncells, YAKL_LAMBDA (Int icell) {
+  parallel_for("compute_htend", mesh->ncells, YAKL_LAMBDA (Int icell) {
       Real accum = -0;
       for (Int j = 0; j < nedges_on_cell(icell); ++j) {
         Int jedge = edges_on_cell(icell, j);
-        
-        Real he = -0;
-        for (Int l = 0; l < 2; ++l) {
-          Int lcell = cells_on_edge(jedge, l);
-          he += h(lcell);
-        }
-        he /= 2;
-
-        accum += dv_edge(jedge) * orient_on_cell(icell, j) * he * v(jedge);
+        accum += dv_edge(jedge) * orient_on_cell(icell, j) * hflux(jedge);
       }
       htend(icell) += -accum / area_cell(icell);
   });
@@ -52,6 +93,7 @@ void ShallowWater::compute_v_tendency(Real1d vtend, RealConst1d h, RealConst1d v
   YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
   YAKL_SCOPE(grav, this->grav);
   YAKL_SCOPE(f0, this->f0);
+  YAKL_SCOPE(hflux, this->hflux);
   
   Real1d qv("qv", mesh->nvertices);
   parallel_for("compute_qv", mesh->nvertices, YAKL_LAMBDA (Int ivertex) {
@@ -79,76 +121,35 @@ void ShallowWater::compute_v_tendency(Real1d vtend, RealConst1d h, RealConst1d v
       }
       qe(iedge) = qe_i / 2;
   });
+  
+  Real1d K("K", mesh->ncells);
+  parallel_for("compute_K", mesh->ncells, YAKL_LAMBDA (Int icell) {
+      Real K_i = -0;
+      for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+        Int jedge = edges_on_cell(icell, j);
+        Real area_edge = dv_edge(jedge) * dc_edge(jedge);
+        K_i += area_edge * v(jedge) * v(jedge) / 4;
+      }
+      K_i /= area_cell(icell);
+      K(icell) = K_i;
+  });
 
-  parallel_for("compute_v_tendency", mesh->nedges, YAKL_LAMBDA (Int iedge) {
+  parallel_for("compute_vtend", mesh->nedges, YAKL_LAMBDA (Int iedge) {
       Real qt = -0;
       for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
         Int jedge = edges_on_edge(iedge, j);
         
-        Real he = -0;
-        for (Int l = 0; l < 2; ++l) {
-          Int lcell = cells_on_edge(jedge, l);
-          he += h(lcell);
-        }
-        he /= 2;
-        qt += weights_on_edge(iedge, j) * dv_edge(jedge) * he * v(jedge) * (qe(iedge) + qe(jedge)) / 2;
+        qt += weights_on_edge(iedge, j) * dv_edge(jedge) * hflux(jedge) * (qe(iedge) + qe(jedge)) / 2;
       }
       qt /= dc_edge(iedge);
 
       Int icell0 = cells_on_edge(iedge, 0);
       Int icell1 = cells_on_edge(iedge, 1);
 
-      Real K0 = -0;
-      for (Int j = 0; j < nedges_on_cell(icell0); ++j) {
-        Int jedge = edges_on_cell(icell0, j);
-        Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-        K0 += area_edge * v(jedge) * v(jedge) / 4;
-      }
-      K0 /= area_cell(icell0);
-      
-      Real K1 = -0;
-      for (Int j = 0; j < nedges_on_cell(icell1); ++j) {
-        Int jedge = edges_on_cell(icell1, j);
-        Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-        K1 += area_edge * v(jedge) * v(jedge) / 4;
-      }
-      K1 /= area_cell(icell1);
-
-      Real grad_B = (K1 - K0 + grav * (h(icell1) - h(icell0))) / dc_edge(iedge);
+      Real grad_B = (K(icell1) - K(icell0) + grav * (h(icell1) - h(icell0))) / dc_edge(iedge);
 
       vtend(iedge) += qt - grad_B;
   });
-}
-
-Real ShallowWater::mass_integral(RealConst1d h) const {
-  Real1d cell_mass("cell_mass", mesh->ncells);
-  
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-
-  parallel_for("compute_cell_mass", mesh->ncells, YAKL_LAMBDA (Int icell) {
-      cell_mass(icell) = area_cell(icell) * h(icell);
-  });
-  return yakl::intrinsics::sum(cell_mass);
-}
-
-Real ShallowWater::circulation_integral(RealConst1d v) const {
-  Real1d cell_circulation("cell_circulation", mesh->nvertices);
-  
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
-  YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
-  YAKL_SCOPE(area_triangle, mesh->area_triangle);
-  YAKL_SCOPE(f0, this->f0);
-
-  parallel_for("compute_cell_circulation", mesh->nvertices, YAKL_LAMBDA (Int ivertex) {
-      Real cir_i = -0;
-      for (Int j = 0; j < 3; ++j) {
-        Int jedge = edges_on_vertex(ivertex, j);
-        cir_i += dc_edge(jedge) * orient_on_vertex(ivertex, j) * v(jedge);
-      }
-      cell_circulation(ivertex) = cir_i + f0 * area_triangle(ivertex);
-  });
-  return yakl::intrinsics::sum(cell_circulation);
 }
 
 Real ShallowWater::energy_integral(RealConst1d h, RealConst1d v) const {
@@ -178,10 +179,10 @@ Real ShallowWater::energy_integral(RealConst1d h, RealConst1d v) const {
 // Linear
 
 LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0) :
-    ShallowWater(mesh, f0), h0(h0) {}
+    ShallowWaterBase(mesh, f0), h0(h0) {}
 
 LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0, Real grav) :
-   ShallowWater(mesh, f0, grav), h0(h0) {}
+   ShallowWaterBase(mesh, f0, grav), h0(h0) {}
 
 void LinearShallowWater::compute_h_tendency(Real1d htend, RealConst1d h, RealConst1d v) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
