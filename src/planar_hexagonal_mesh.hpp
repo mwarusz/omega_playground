@@ -23,7 +23,7 @@ struct PlanarHexagonalMesh {
   Int2d edges_on_cell;
   Int2d vertices_on_cell;
   Int2d orient_on_cell;
-  
+
   Real1d area_cell;
   Real1d lat_cell;
   Real1d lon_cell;
@@ -38,7 +38,7 @@ struct PlanarHexagonalMesh {
   Int2d cells_on_edge;
   Int2d vertices_on_edge;
   Int2d edges_on_edge;
-  
+
   Real1d dc_edge;
   Real1d dv_edge;
   Real1d angle_edge;
@@ -48,13 +48,13 @@ struct PlanarHexagonalMesh {
   Real1d y_edge;
   Real1d z_edge;
   Real2d weights_on_edge;
-  
+
   Int1d max_level_vertex_bot;
   Int1d max_level_vertex_top;
   Int2d edges_on_vertex;
   Int2d cells_on_vertex;
   Int2d orient_on_vertex;
-  
+
   Real1d area_triangle;
   Real1d lat_vertex;
   Real1d lon_vertex;
@@ -62,7 +62,7 @@ struct PlanarHexagonalMesh {
   Real1d y_vertex;
   Real1d z_vertex;
   Real2d kiteareas_on_vertex;
-  
+
   PlanarHexagonalMesh(Int nx, Int ny, Int nlayers = 1);
   PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers = 1);
   YAKL_INLINE Int cellidx(Int icol, Int irow) const;
@@ -72,4 +72,4 @@ struct PlanarHexagonalMesh {
 
   void compute_mesh_arrays();
 };
-}
+} // namespace omega

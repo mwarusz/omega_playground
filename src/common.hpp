@@ -8,16 +8,14 @@ namespace omega {
 using Real = double;
 using Int = int;
 
-YAKL_INLINE constexpr Real operator""_fp(long double x) {
-  return x;
-}
+YAKL_INLINE constexpr Real operator""_fp(long double x) { return x; }
 
 constexpr Real pi = M_PI;
 
+using yakl::SArray;
+using yakl::c::Bounds;
 using yakl::c::parallel_for;
 using yakl::c::SimpleBounds;
-using yakl::c::Bounds;
-using yakl::SArray;
 
 using Real1d = yakl::Array<Real, 1, yakl::memDevice, yakl::styleC>;
 using Real2d = yakl::Array<Real, 2, yakl::memDevice, yakl::styleC>;
@@ -43,4 +41,4 @@ using IntHost1d = yakl::Array<Int, 1, yakl::memHost, yakl::styleC>;
 using IntHost2d = yakl::Array<Int, 2, yakl::memHost, yakl::styleC>;
 using IntHost3d = yakl::Array<Int, 3, yakl::memHost, yakl::styleC>;
 using IntHost4d = yakl::Array<Int, 4, yakl::memHost, yakl::styleC>;
-}
+} // namespace omega
