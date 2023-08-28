@@ -81,7 +81,7 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
         Real accum = -0;
         for (Int j = 0; j < mesh.nedges_on_cell(icell); ++j) {
           Int jedge = mesh.edges_on_cell(icell, j);
-          accum += mesh.dv_edge(jedge) * mesh.orient_on_cell(icell, j) *
+          accum += mesh.dv_edge(jedge) * mesh.edge_sign_on_cell(icell, j) *
                    input_field(jedge);
         }
         div_field(icell) = accum / mesh.area_cell(icell);
@@ -129,7 +129,7 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
         Real accum = -0;
         for (Int j = 0; j < 3; ++j) {
           Int jedge = mesh.edges_on_vertex(ivertex, j);
-          accum += mesh.dc_edge(jedge) * mesh.orient_on_vertex(ivertex, j) *
+          accum += mesh.dc_edge(jedge) * mesh.edge_sign_on_vertex(ivertex, j) *
                    input_field(jedge);
         }
         curl_field(ivertex) = accum / mesh.area_triangle(ivertex);

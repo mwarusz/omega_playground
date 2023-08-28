@@ -31,7 +31,7 @@ Real ShallowWaterBase::circulation_integral(RealConst2d v) const {
 
   YAKL_SCOPE(dc_edge, mesh->dc_edge);
   YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
-  YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
+  YAKL_SCOPE(edge_sign_on_vertex, mesh->edge_sign_on_vertex);
   YAKL_SCOPE(area_triangle, mesh->area_triangle);
   YAKL_SCOPE(f0, this->f0);
   YAKL_SCOPE(max_level_vertex_bot, mesh->max_level_vertex_bot);
@@ -44,7 +44,7 @@ Real ShallowWaterBase::circulation_integral(RealConst2d v) const {
           for (Int j = 0; j < 3; ++j) {
             Int jedge = edges_on_vertex(ivertex, j);
             cir_i +=
-                dc_edge(jedge) * orient_on_vertex(ivertex, j) * v(jedge, k);
+                dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) * v(jedge, k);
           }
           column_circulation(ivertex) += cir_i + f0 * area_triangle(ivertex);
         }
@@ -66,7 +66,7 @@ void ShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
   YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
-  YAKL_SCOPE(orient_on_cell, mesh->orient_on_cell);
+  YAKL_SCOPE(edge_sign_on_cell, mesh->edge_sign_on_cell);
   YAKL_SCOPE(area_cell, mesh->area_cell);
   YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
   YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
@@ -92,7 +92,7 @@ void ShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
             accum +=
-                dv_edge(jedge) * orient_on_cell(icell, j) * hflux(jedge, k);
+                dv_edge(jedge) * edge_sign_on_cell(icell, j) * hflux(jedge, k);
           }
           htend(icell, k) += -accum / area_cell(icell);
         }
@@ -102,7 +102,7 @@ void ShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
 void ShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
                                       RealConst2d v) const {
   YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
-  YAKL_SCOPE(orient_on_vertex, mesh->orient_on_vertex);
+  YAKL_SCOPE(edge_sign_on_vertex, mesh->edge_sign_on_vertex);
   YAKL_SCOPE(kiteareas_on_vertex, mesh->kiteareas_on_vertex);
   YAKL_SCOPE(cells_on_vertex, mesh->cells_on_vertex);
   YAKL_SCOPE(area_triangle, mesh->area_triangle);
@@ -132,7 +132,8 @@ void ShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
           Real qv_i = -0;
           for (Int j = 0; j < 3; ++j) {
             Int jedge = edges_on_vertex(ivertex, j);
-            qv_i += dc_edge(jedge) * orient_on_vertex(ivertex, j) * v(jedge, k);
+            qv_i +=
+                dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) * v(jedge, k);
           }
 
           Real hv_i = -0;
@@ -241,7 +242,7 @@ void LinearShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(orient_on_cell, mesh->orient_on_cell);
+  YAKL_SCOPE(edge_sign_on_cell, mesh->edge_sign_on_cell);
   YAKL_SCOPE(area_cell, mesh->area_cell);
   YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
   YAKL_SCOPE(h0, this->h0);
@@ -252,7 +253,7 @@ void LinearShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
           Real accum = -0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
-            accum += dv_edge(jedge) * orient_on_cell(icell, j) * v(jedge, k);
+            accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) * v(jedge, k);
           }
           htend(icell, k) += -h0 * accum / area_cell(icell);
         }

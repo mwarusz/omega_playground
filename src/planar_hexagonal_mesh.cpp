@@ -20,7 +20,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   this->cells_on_cell = Int2d("cells_on_cell", ncells, maxedges);
   this->edges_on_cell = Int2d("edges_on_cell", ncells, maxedges);
   this->vertices_on_cell = Int2d("vertices_on_cell", ncells, maxedges);
-  this->orient_on_cell = Int2d("orient_on_cell", ncells, maxedges);
+  this->edge_sign_on_cell = Int2d("edge_sign_on_cell", ncells, maxedges);
 
   this->area_cell = Real1d("area_cell", ncells);
   this->lat_cell = Real1d("lat_cell", ncells);
@@ -53,7 +53,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   this->max_level_vertex_top = Int1d("max_level_vertex_top", nvertices);
   this->edges_on_vertex = Int2d("edges_on_vertex", nvertices, 3);
   this->cells_on_vertex = Int2d("cells_on_vertex", nvertices, 3);
-  this->orient_on_vertex = Int2d("orient_on_vertex", nvertices, 3);
+  this->edge_sign_on_vertex = Int2d("edge_sign_on_vertex", nvertices, 3);
 
   this->area_triangle = Real1d("area_triangle", nvertices);
   this->lat_vertex = Real1d("lat_vertex", nvertices);
@@ -339,7 +339,7 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         z_vertex(vertices_on_cell(icell, 1)) = 0;
 
         for (Int j = 0; j < maxedges; ++j) {
-          orient_on_cell(icell, j) =
+          edge_sign_on_cell(icell, j) =
               cells_on_edge(edges_on_cell(icell, j), 0) == icell ? 1 : -1;
         }
       });
@@ -363,7 +363,7 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         }
 
         for (Int j = 0; j < 3; ++j) {
-          orient_on_vertex(ivertex, j) =
+          edge_sign_on_vertex(ivertex, j) =
               vertices_on_edge(edges_on_vertex(ivertex, j), 0) == ivertex ? -1
                                                                           : 1;
         }

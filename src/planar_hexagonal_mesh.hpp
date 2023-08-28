@@ -22,7 +22,7 @@ struct PlanarHexagonalMesh {
   Int2d cells_on_cell;
   Int2d edges_on_cell;
   Int2d vertices_on_cell;
-  Int2d orient_on_cell;
+  Int2d edge_sign_on_cell;
 
   Real1d area_cell;
   Real1d lat_cell;
@@ -53,7 +53,7 @@ struct PlanarHexagonalMesh {
   Int1d max_level_vertex_top;
   Int2d edges_on_vertex;
   Int2d cells_on_vertex;
-  Int2d orient_on_vertex;
+  Int2d edge_sign_on_vertex;
 
   Real1d area_triangle;
   Real1d lat_vertex;
