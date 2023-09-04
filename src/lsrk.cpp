@@ -37,7 +37,8 @@ void LSRKStepper::do_step(Real t, Real dt, Real2d h, Real2d v) const {
         YAKL_LAMBDA(Int iedge, Int k) { vtend(iedge, k) *= rka_stage; });
 
     Real stagetime = t + rkc[stage] * dt;
-    shallow_water->compute_tendency(htend, vtend, h, v, stagetime);
+    shallow_water->compute_tendency(htend, vtend, h, v, stagetime,
+                                    AddMode::increment);
 
     Real rkb_stage = rkb[stage];
     parallel_for(
