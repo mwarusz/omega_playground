@@ -63,7 +63,7 @@ void RK4Stepper::do_step(Real t, Real dt, Real2d h, Real2d v) const {
           v(iedge, k) += dt * rkb_stage * vtend(iedge, k);
         });
 
-    if (stage < nstages) {
+    if (stage < nstages - 1) {
       Real stagetime = t + rkc[stage] * dt;
       const Real rka_stage = rka[stage];
 
