@@ -9,8 +9,7 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
 }
 
 struct ManufacturedSolution {
-
-  Real grav = 9.81;
+  Real grav = 9.80616;
   Real f0 = 1e-4;
   Real lx = 10000 * 1e3;
   Real ly = std::sqrt(3) / 2 * lx;
@@ -20,7 +19,7 @@ struct ManufacturedSolution {
   Int my = 2;
   Real kx = mx * (2 * pi / lx);
   Real ky = my * (2 * pi / ly);
-  Real omega = std::sqrt(f0 * f0 + grav * h0 * (kx * kx + ky * ky));
+  Real omega = std::sqrt(grav * h0 * (kx * kx + ky * ky));
 
   YAKL_INLINE Real h(Real x, Real y, Real t) const {
     return h0 + eta0 * std::sin(kx * x + ky * y - omega * t);
@@ -116,12 +115,11 @@ Real run(Int n) {
   ManufacturedSolution manufactured_solution;
   PlanarHexagonalMesh mesh(n, n, manufactured_solution.lx / n);
   ManufacturedShallowWater shallow_water(mesh, manufactured_solution);
-  LSRKStepper stepper(shallow_water);
+  RK4Stepper stepper(shallow_water);
 
   Real timeend = 10 * 60 * 60;
-  Real cfl = 1.0;
-  Real dt =
-      cfl * mesh.dc / std::sqrt(shallow_water.grav * manufactured_solution.h0);
+  Real dt_per_km = 3;
+  Real dt = dt_per_km * mesh.dc / 1e3;
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -159,18 +157,18 @@ Real run(Int n) {
       "compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         hexact(icell, k) -= h(icell, k);
-        hexact(icell, k) = std::abs(hexact(icell, k));
+        hexact(icell, k) *= hexact(icell, k);
       });
 
-  return yakl::intrinsics::maxval(hexact);
+  return std::sqrt(yakl::intrinsics::sum(hexact) / (mesh.nx * mesh.ny));
 }
 
 int main() {
   yakl::init();
 
-  Int nlevels = 3;
+  Int nlevels = 2;
   std::vector<Real> err(nlevels);
-  Int nx = 16;
+  Int nx = 50;
 
   for (Int l = 0; l < nlevels; ++l) {
     err[l] = run(nx);

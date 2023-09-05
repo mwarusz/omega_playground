@@ -11,7 +11,7 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
 struct InertiaGravityWave {
   Real h0 = 1000;
   Real eta0 = 1;
-  Real grav = 9.81;
+  Real grav = 9.80616;
   Real f0 = 1e-4;
   Real lx = 10000 * 1e3;
   Real ly = std::sqrt(3) / 2 * lx;
@@ -22,7 +22,7 @@ struct InertiaGravityWave {
   Real omega = std::sqrt(f0 * f0 + grav * h0 * (kx * kx + ky * ky));
 
   YAKL_INLINE Real h(Real x, Real y, Real t) const {
-    return eta0 * std::cos(kx * x + ky * y - omega * t);
+    return h0 + eta0 * std::cos(kx * x + ky * y - omega * t);
   }
 
   YAKL_INLINE Real vx(Real x, Real y, Real t) const {
@@ -45,11 +45,11 @@ Real run(Int nx) {
   LinearShallowWater shallow_water(mesh, inertia_gravity_wave.h0,
                                    inertia_gravity_wave.f0,
                                    inertia_gravity_wave.grav);
-  LSRKStepper stepper(shallow_water);
+  RK4Stepper stepper(shallow_water);
 
   Real timeend = 10 * 60 * 60;
-  Real cfl = 1.0;
-  Real dt = cfl * mesh.dc / std::sqrt(shallow_water.grav * shallow_water.h0);
+  Real dt_per_km = 3;
+  Real dt = dt_per_km * mesh.dc / 1e3;
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -87,17 +87,17 @@ Real run(Int nx) {
       "compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         hexact(icell, k) -= h(icell, k);
-        hexact(icell, k) = std::abs(hexact(icell, k));
+        hexact(icell, k) *= hexact(icell, k);
       });
 
-  return yakl::intrinsics::maxval(hexact);
+  return std::sqrt(yakl::intrinsics::sum(hexact) / (mesh.nx * mesh.ny));
 }
 
 int main() {
   yakl::init();
 
-  Int nlevels = 3;
-  Int nx = 16;
+  Int nlevels = 2;
+  Int nx = 50;
 
   std::vector<Real> err(nlevels);
   for (Int l = 0; l < nlevels; ++l) {
