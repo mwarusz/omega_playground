@@ -106,19 +106,19 @@ void run(Int nx, Real cfl) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  Real2d h("h", mesh.ncells, mesh.nlayers);
-  Real2d v("v", mesh.nedges, mesh.nlayers);
+  Real2d h_cell("h_cell", mesh.ncells, mesh.nlayers);
+  Real2d vn_edge("vn_edge", mesh.nedges, mesh.nlayers);
 
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell, k) = double_vortex.h(x, y);
+        h_cell(icell, k) = double_vortex.h(x, y);
       });
 
   parallel_for(
-      "init_v", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
+      "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real x = mesh.x_edge(iedge);
         Real y = mesh.y_edge(iedge);
@@ -126,31 +126,31 @@ void run(Int nx, Real cfl) {
         Real ny = std::sin(mesh.angle_edge(iedge));
         Real vx = double_vortex.vx(x, y);
         Real vy = double_vortex.vy(x, y);
-        v(iedge, k) = nx * vx + ny * vy;
+        vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
-  Real mass0 = shallow_water.mass_integral(h);
-  Real cir0 = shallow_water.circulation_integral(v);
-  Real en0 = shallow_water.energy_integral(h, v);
+  Real mass0 = shallow_water.mass_integral(h_cell);
+  Real cir0 = shallow_water.circulation_integral(vn_edge);
+  Real en0 = shallow_water.energy_integral(h_cell, vn_edge);
 
-  std::cout << "Initial h: " << yakl::intrinsics::minval(h) << " "
-            << yakl::intrinsics::maxval(h) << std::endl;
-  std::cout << "Initial v: " << yakl::intrinsics::minval(v) << " "
-            << yakl::intrinsics::maxval(v) << std::endl;
+  std::cout << "Initial h: " << yakl::intrinsics::minval(h_cell) << " "
+            << yakl::intrinsics::maxval(h_cell) << std::endl;
+  std::cout << "Initial vn: " << yakl::intrinsics::minval(vn_edge) << " "
+            << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
-    stepper.do_step(t, dt, h, v);
+    stepper.do_step(t, dt, h_cell, vn_edge);
   }
 
-  std::cout << "Final h: " << yakl::intrinsics::minval(h) << " "
-            << yakl::intrinsics::maxval(h) << std::endl;
-  std::cout << "Final v: " << yakl::intrinsics::minval(v) << " "
-            << yakl::intrinsics::maxval(v) << std::endl;
+  std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
+            << yakl::intrinsics::maxval(h_cell) << std::endl;
+  std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
+            << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
-  Real massf = shallow_water.mass_integral(h);
-  Real cirf = shallow_water.circulation_integral(v);
-  Real enf = shallow_water.energy_integral(h, v);
+  Real massf = shallow_water.mass_integral(h_cell);
+  Real cirf = shallow_water.circulation_integral(vn_edge);
+  Real enf = shallow_water.energy_integral(h_cell, vn_edge);
 
   Real mass_change = (massf - mass0) / mass0;
   Real cir_change = (cirf - cir0) / cir0;

@@ -53,21 +53,21 @@ Real run(Int nx) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  Real2d h("h", mesh.ncells, mesh.nlayers);
-  Real2d hexact("hexact", mesh.ncells, mesh.nlayers);
-  Real2d v("v", mesh.nedges, mesh.nlayers);
+  Real2d h_cell("h_cell", mesh.ncells, mesh.nlayers);
+  Real2d hexact_cell("hexact_cell", mesh.ncells, mesh.nlayers);
+  Real2d vn_edge("vn_edge", mesh.nedges, mesh.nlayers);
 
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell, k) = inertia_gravity_wave.h(x, y, 0);
-        hexact(icell, k) = inertia_gravity_wave.h(x, y, timeend);
+        h_cell(icell, k) = inertia_gravity_wave.h(x, y, 0);
+        hexact_cell(icell, k) = inertia_gravity_wave.h(x, y, timeend);
       });
 
   parallel_for(
-      "init_v", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
+      "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real x = mesh.x_edge(iedge);
         Real y = mesh.y_edge(iedge);
@@ -75,22 +75,22 @@ Real run(Int nx) {
         Real ny = std::sin(mesh.angle_edge(iedge));
         Real vx = inertia_gravity_wave.vx(x, y, 0);
         Real vy = inertia_gravity_wave.vy(x, y, 0);
-        v(iedge, k) = nx * vx + ny * vy;
+        vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
-    stepper.do_step(t, dt, h, v);
+    stepper.do_step(t, dt, h_cell, vn_edge);
   }
 
   parallel_for(
       "compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        hexact(icell, k) -= h(icell, k);
-        hexact(icell, k) *= hexact(icell, k);
+        hexact_cell(icell, k) -= h_cell(icell, k);
+        hexact_cell(icell, k) *= hexact_cell(icell, k);
       });
 
-  return std::sqrt(yakl::intrinsics::sum(hexact) / (mesh.nx * mesh.ny));
+  return std::sqrt(yakl::intrinsics::sum(hexact_cell) / (mesh.nx * mesh.ny));
 }
 
 int main() {

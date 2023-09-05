@@ -10,7 +10,7 @@ ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0,
                                    Real grav)
     : mesh(&mesh), f0(f0), grav(grav) {}
 
-Real ShallowWaterBase::mass_integral(RealConst2d h) const {
+Real ShallowWaterBase::mass_integral(RealConst2d h_cell) const {
   Real1d column_mass("column_mass", mesh->ncells);
 
   YAKL_SCOPE(area_cell, mesh->area_cell);
@@ -20,13 +20,13 @@ Real ShallowWaterBase::mass_integral(RealConst2d h) const {
       "compute_column_mass", mesh->ncells, YAKL_LAMBDA(Int icell) {
         column_mass(icell) = 0;
         for (Int k = 0; k < max_level_cell(icell); ++k) {
-          column_mass(icell) += area_cell(icell) * h(icell, k);
+          column_mass(icell) += area_cell(icell) * h_cell(icell, k);
         }
       });
   return yakl::intrinsics::sum(column_mass);
 }
 
-Real ShallowWaterBase::circulation_integral(RealConst2d v) const {
+Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
   Real1d column_circulation("column_circulation", mesh->nvertices);
 
   YAKL_SCOPE(dc_edge, mesh->dc_edge);
@@ -43,8 +43,8 @@ Real ShallowWaterBase::circulation_integral(RealConst2d v) const {
           Real cir_i = -0;
           for (Int j = 0; j < 3; ++j) {
             Int jedge = edges_on_vertex(ivertex, j);
-            cir_i +=
-                dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) * v(jedge, k);
+            cir_i += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
+                     vn_edge(jedge, k);
           }
           column_circulation(ivertex) += cir_i + f0 * area_triangle(ivertex);
         }
@@ -60,8 +60,9 @@ ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav)
     : ShallowWaterBase(mesh, f0, grav),
       hflux("hflux", mesh.nedges, mesh.nlayers) {}
 
-void ShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
-                                      RealConst2d v, AddMode add_mode) const {
+void ShallowWater::compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
+                                      RealConst2d vn_edge,
+                                      AddMode add_mode) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
@@ -78,10 +79,10 @@ void ShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
           Real he = -0;
           for (Int j = 0; j < 2; ++j) {
             Int jcell = cells_on_edge(iedge, j);
-            he += h(jcell, k);
+            he += h_cell(jcell, k);
           }
           he /= 2;
-          hflux(iedge, k) = he * v(iedge, k);
+          hflux(iedge, k) = he * vn_edge(iedge, k);
         }
       });
 
@@ -96,18 +97,19 @@ void ShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
           }
 
           if (add_mode == AddMode::increment) {
-            htend(icell, k) += -accum / area_cell(icell);
+            h_tend_cell(icell, k) += -accum / area_cell(icell);
           }
 
           if (add_mode == AddMode::replace) {
-            htend(icell, k) = -accum / area_cell(icell);
+            h_tend_cell(icell, k) = -accum / area_cell(icell);
           }
         }
       });
 }
 
-void ShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
-                                      RealConst2d v, AddMode add_mode) const {
+void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
+                                       RealConst2d vn_edge,
+                                       AddMode add_mode) const {
   YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
   YAKL_SCOPE(edge_sign_on_vertex, mesh->edge_sign_on_vertex);
   YAKL_SCOPE(kiteareas_on_vertex, mesh->kiteareas_on_vertex);
@@ -139,14 +141,14 @@ void ShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
           Real qv_i = -0;
           for (Int j = 0; j < 3; ++j) {
             Int jedge = edges_on_vertex(ivertex, j);
-            qv_i +=
-                dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) * v(jedge, k);
+            qv_i += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
+                    vn_edge(jedge, k);
           }
 
           Real hv_i = -0;
           for (Int j = 0; j < 3; ++j) {
             Int jcell = cells_on_vertex(ivertex, j);
-            hv_i += kiteareas_on_vertex(ivertex, j) * h(jcell, k);
+            hv_i += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
           }
           qv(ivertex, k) = (qv_i + f0 * area_triangle(ivertex)) / hv_i;
         }
@@ -173,7 +175,7 @@ void ShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
             Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-            K_i += area_edge * v(jedge, k) * v(jedge, k) / 4;
+            K_i += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
           }
           K_i /= area_cell(icell);
           K(icell, k) = K_i;
@@ -196,20 +198,21 @@ void ShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
           Int icell1 = cells_on_edge(iedge, 1);
 
           Real grad_B = (K(icell1, k) - K(icell0, k) +
-                         grav * (h(icell1, k) - h(icell0, k))) /
+                         grav * (h_cell(icell1, k) - h_cell(icell0, k))) /
                         dc_edge(iedge);
 
           if (add_mode == AddMode::increment) {
-            vtend(iedge, k) += qt - grad_B;
+            vn_tend_edge(iedge, k) += qt - grad_B;
           }
           if (add_mode == AddMode::replace) {
-            vtend(iedge, k) = qt - grad_B;
+            vn_tend_edge(iedge, k) = qt - grad_B;
           }
         }
       });
 }
 
-Real ShallowWater::energy_integral(RealConst2d h, RealConst2d v) const {
+Real ShallowWater::energy_integral(RealConst2d h_cell,
+                                   RealConst2d vn_edge) const {
   Real1d column_energy("column_energy", mesh->ncells);
 
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -228,12 +231,12 @@ Real ShallowWater::energy_integral(RealConst2d h, RealConst2d v) const {
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
             Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-            K += area_edge * v(jedge, k) * v(jedge, k) / 4;
+            K += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
           }
           K /= area_cell(icell);
-          column_energy(icell) +=
-              area_cell(icell) *
-              (grav * h(icell, k) * h(icell, k) / 2 + h(icell, k) * K);
+          column_energy(icell) += area_cell(icell) * (grav * h_cell(icell, k) *
+                                                          h_cell(icell, k) / 2 +
+                                                      h_cell(icell, k) * K);
         }
       });
   return yakl::intrinsics::sum(column_energy);
@@ -249,8 +252,9 @@ LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0,
                                        Real f0, Real grav)
     : ShallowWaterBase(mesh, f0, grav), h0(h0) {}
 
-void LinearShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
-                                            RealConst2d v,
+void LinearShallowWater::compute_h_tendency(Real2d h_tend_cell,
+                                            RealConst2d h_cell,
+                                            RealConst2d vn_edge,
                                             AddMode add_mode) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
@@ -266,21 +270,23 @@ void LinearShallowWater::compute_h_tendency(Real2d htend, RealConst2d h,
           Real accum = -0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
-            accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) * v(jedge, k);
+            accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                     vn_edge(jedge, k);
           }
           if (add_mode == AddMode::increment) {
-            htend(icell, k) += -h0 * accum / area_cell(icell);
+            h_tend_cell(icell, k) += -h0 * accum / area_cell(icell);
           }
           if (add_mode == AddMode::replace) {
-            htend(icell, k) = -h0 * accum / area_cell(icell);
+            h_tend_cell(icell, k) = -h0 * accum / area_cell(icell);
           }
         }
       });
 }
 
-void LinearShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
-                                            RealConst2d v,
-                                            AddMode add_mode) const {
+void LinearShallowWater::compute_vn_tendency(Real2d vn_tend_edge,
+                                             RealConst2d h_cell,
+                                             RealConst2d vn_edge,
+                                             AddMode add_mode) const {
   YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
   YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
   YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
@@ -297,25 +303,28 @@ void LinearShallowWater::compute_v_tendency(Real2d vtend, RealConst2d h,
           Real vt = -0;
           for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
             Int jedge = edges_on_edge(iedge, j);
-            vt += weights_on_edge(iedge, j) * dv_edge(jedge) * v(jedge, k);
+            vt +=
+                weights_on_edge(iedge, j) * dv_edge(jedge) * vn_edge(jedge, k);
           }
           vt /= dc_edge(iedge);
 
           Int icell0 = cells_on_edge(iedge, 0);
           Int icell1 = cells_on_edge(iedge, 1);
-          Real grad_h = (h(icell1, k) - h(icell0, k)) / dc_edge(iedge);
+          Real grad_h =
+              (h_cell(icell1, k) - h_cell(icell0, k)) / dc_edge(iedge);
 
           if (add_mode == AddMode::increment) {
-            vtend(iedge, k) += f0 * vt - grav * grad_h;
+            vn_tend_edge(iedge, k) += f0 * vt - grav * grad_h;
           }
           if (add_mode == AddMode::replace) {
-            vtend(iedge, k) = f0 * vt - grav * grad_h;
+            vn_tend_edge(iedge, k) = f0 * vt - grav * grad_h;
           }
         }
       });
 }
 
-Real LinearShallowWater::energy_integral(RealConst2d h, RealConst2d v) const {
+Real LinearShallowWater::energy_integral(RealConst2d h_cell,
+                                         RealConst2d vn_edge) const {
   Real1d column_energy("column_energy", mesh->ncells);
 
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -335,12 +344,12 @@ Real LinearShallowWater::energy_integral(RealConst2d h, RealConst2d v) const {
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
             Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-            K += area_edge * v(jedge, k) * v(jedge, k) / 4;
+            K += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
           }
           K /= area_cell(icell);
           column_energy(icell) +=
               area_cell(icell) *
-              (grav * h(icell, k) * h(icell, k) / 2 + h0 * K);
+              (grav * h_cell(icell, k) * h_cell(icell, k) / 2 + h0 * K);
         }
       });
   return yakl::intrinsics::sum(column_energy);
