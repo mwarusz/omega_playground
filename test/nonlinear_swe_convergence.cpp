@@ -33,7 +33,7 @@ struct ManufacturedSolution {
     return eta0 * std::cos(kx * x + ky * y - omega * t);
   }
 
-  YAKL_INLINE Real htend(Real x, Real y, Real t) const {
+  YAKL_INLINE Real h_tend(Real x, Real y, Real t) const {
     using std::cos;
     using std::sin;
 
@@ -42,7 +42,7 @@ struct ManufacturedSolution {
                    eta0 * (kx + ky) * cos(2 * phi));
   }
 
-  YAKL_INLINE Real vxtend(Real x, Real y, Real t) const {
+  YAKL_INLINE Real vx_tend(Real x, Real y, Real t) const {
     using std::cos;
     using std::sin;
 
@@ -51,7 +51,7 @@ struct ManufacturedSolution {
                    eta0 * (kx + ky) * sin(2 * phi) / 2);
   }
 
-  YAKL_INLINE Real vytend(Real x, Real y, Real t) const {
+  YAKL_INLINE Real vy_tend(Real x, Real y, Real t) const {
     using std::cos;
     using std::sin;
 
@@ -70,8 +70,9 @@ struct ManufacturedShallowWater : ShallowWater {
                      manufactured_solution.grav),
         manufactured_solution(manufactured_solution) {}
 
-  void additional_tendency(Real2d htend, Real2d vtend, RealConst2d h,
-                           RealConst2d v, Real t) const override {
+  void additional_tendency(Real2d h_tend_cell, Real2d vn_tend_edge,
+                           RealConst2d h_cell, RealConst2d vn_edge,
+                           Real t) const override {
     using std::cos;
     using std::sin;
 
@@ -85,7 +86,7 @@ struct ManufacturedShallowWater : ShallowWater {
           for (Int k = 0; k < max_level_cell(icell); ++k) {
             Real x = x_cell(icell);
             Real y = y_cell(icell);
-            htend(icell, k) += manufactured_solution.htend(x, y, t);
+            h_tend_cell(icell, k) += manufactured_solution.h_tend(x, y, t);
           }
         });
 
@@ -102,10 +103,10 @@ struct ManufacturedShallowWater : ShallowWater {
             Real nx = std::cos(angle_edge(iedge));
             Real ny = std::sin(angle_edge(iedge));
 
-            Real vxtend = manufactured_solution.vxtend(x, y, t);
-            Real vytend = manufactured_solution.vytend(x, y, t);
+            Real vx_tend = manufactured_solution.vx_tend(x, y, t);
+            Real vy_tend = manufactured_solution.vy_tend(x, y, t);
 
-            vtend(iedge, k) += nx * vxtend + ny * vytend;
+            vn_tend_edge(iedge, k) += nx * vx_tend + ny * vy_tend;
           }
         });
   }
@@ -123,21 +124,21 @@ Real run(Int n) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  Real2d h("h", mesh.ncells, mesh.nlayers);
-  Real2d hexact("hexact", mesh.ncells, mesh.nlayers);
-  Real2d v("v", mesh.nedges, mesh.nlayers);
+  Real2d h_cell("h_cell", mesh.ncells, mesh.nlayers);
+  Real2d hexact_cell("hexact_cell", mesh.ncells, mesh.nlayers);
+  Real2d vn_edge("vn_edge", mesh.nedges, mesh.nlayers);
 
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real x = mesh.x_cell(icell);
         Real y = mesh.y_cell(icell);
-        h(icell, k) = manufactured_solution.h(x, y, 0);
-        hexact(icell, k) = manufactured_solution.h(x, y, timeend);
+        h_cell(icell, k) = manufactured_solution.h(x, y, 0);
+        hexact_cell(icell, k) = manufactured_solution.h(x, y, timeend);
       });
 
   parallel_for(
-      "init_v", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
+      "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real x = mesh.x_edge(iedge);
         Real y = mesh.y_edge(iedge);
@@ -145,22 +146,22 @@ Real run(Int n) {
         Real ny = std::sin(mesh.angle_edge(iedge));
         Real vx = manufactured_solution.vx(x, y, 0);
         Real vy = manufactured_solution.vy(x, y, 0);
-        v(iedge, k) = nx * vx + ny * vy;
+        vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
-    stepper.do_step(t, dt, h, v);
+    stepper.do_step(t, dt, h_cell, vn_edge);
   }
 
   parallel_for(
       "compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        hexact(icell, k) -= h(icell, k);
-        hexact(icell, k) *= hexact(icell, k);
+        hexact_cell(icell, k) -= h_cell(icell, k);
+        hexact_cell(icell, k) *= hexact_cell(icell, k);
       });
 
-  return std::sqrt(yakl::intrinsics::sum(hexact) / (mesh.nx * mesh.ny));
+  return std::sqrt(yakl::intrinsics::sum(hexact_cell) / (mesh.nx * mesh.ny));
 }
 
 int main() {

@@ -182,10 +182,9 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
         Real accum = -0;
         for (Int j = 0; j < n; ++j) {
           Int iedge2 = mesh.edges_on_edge(iedge, j);
-          accum += mesh.weights_on_edge(iedge, j) * mesh.dv_edge(iedge2) *
-                   input_field(iedge2);
+          accum += mesh.weights_on_edge(iedge, j) * input_field(iedge2);
         }
-        recon_field(iedge) = accum / mesh.dc_edge(iedge);
+        recon_field(iedge) = accum;
 
         exact_recon_field(iedge) -= recon_field(iedge);
         exact_recon_field(iedge) = abs(exact_recon_field(iedge));
