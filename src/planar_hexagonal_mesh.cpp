@@ -292,10 +292,11 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
             edges_on_cell(icell, 2);
       });
 
-  // parallel_for("scale_weights",
-  //     SimpleBounds<2>(nedges, 2 * maxedges), YAKL_CLASS_LAMBDA(Int iedge, Int
-  //     j) { weights_on_edge(iedge, j) *= 1. / sqrt(3);
-  // });
+  parallel_for(
+      "scale_weights", SimpleBounds<2>(nedges, 2 * maxedges),
+      YAKL_CLASS_LAMBDA(Int iedge, Int j) {
+        weights_on_edge(iedge, j) *= 1. / sqrt(3);
+      });
 
   parallel_for(
       "compute_cell_arrays", SimpleBounds<2>(ny, nx),

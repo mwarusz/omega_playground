@@ -9,9 +9,12 @@ enum class AddMode { replace, increment };
 
 struct ShallowWaterBase {
   PlanarHexagonalMesh *mesh;
-  Real grav = 9.81;
-  // TODO: generalize to variable f
-  Real f0;
+  Real grav;
+  Real1d f_vertex;
+  Real1d f_edge;
+
+  virtual void compute_auxiliary_variables(RealConst2d h_cell,
+                                           RealConst2d vn_edge) const {}
 
   virtual void compute_h_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                                   RealConst2d vn_edge,
@@ -32,6 +35,10 @@ struct ShallowWaterBase {
                         AddMode add_mode = AddMode::replace) const {
     yakl::timer_start("compute_tendency");
 
+    yakl::timer_start("compute_auxiliary_variables");
+    compute_auxiliary_variables(h_cell, vn_edge);
+    yakl::timer_stop("compute_auxiliary_variables");
+
     yakl::timer_start("h_tendency");
     compute_h_tendency(h_tend_cell, h_cell, vn_edge, add_mode);
     yakl::timer_stop("h_tendency");
@@ -50,7 +57,26 @@ struct ShallowWaterBase {
 };
 
 struct ShallowWater : ShallowWaterBase {
-  Real2d hflux;
+  Real2d h_flux_edge;
+  Real2d h_mean_edge;
+  Real2d h_drag_edge;
+
+  Real2d rcirc_vertex;
+  Real2d rvort_vertex;
+
+  Real2d rvort_cell;
+  Real2d ke_cell;
+  Real2d vt_edge;
+
+  Real2d norm_rvort_vertex;
+  Real2d norm_f_vertex;
+  Real2d norm_rvort_edge;
+  Real2d norm_f_edge;
+  Real2d norm_rvort_cell;
+
+  void compute_auxiliary_variables(RealConst2d h_cell,
+                                   RealConst2d vn_edge) const override;
+
   void compute_h_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                           RealConst2d vn_edge, AddMode add_mode) const override;
   void compute_vn_tendency(Real2d h_tend_cell, RealConst2d h_cell,
