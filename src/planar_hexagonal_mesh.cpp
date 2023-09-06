@@ -21,6 +21,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   this->edges_on_cell = Int2d("edges_on_cell", ncells, maxedges);
   this->vertices_on_cell = Int2d("vertices_on_cell", ncells, maxedges);
   this->edge_sign_on_cell = Int2d("edge_sign_on_cell", ncells, maxedges);
+  this->kite_index_on_cell = Int2d("kite_index_on_cell", ncells, maxedges);
 
   this->area_cell = Real1d("area_cell", ncells);
   this->lat_cell = Real1d("lat_cell", ncells);
@@ -341,6 +342,15 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         for (Int j = 0; j < maxedges; ++j) {
           edge_sign_on_cell(icell, j) =
               cells_on_edge(edges_on_cell(icell, j), 0) == icell ? 1 : -1;
+        }
+
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          Int jvertex = vertices_on_cell(icell, j);
+          for (Int l = 0; l < 3; ++l) {
+            if (cells_on_vertex(jvertex, l) == icell) {
+              kite_index_on_cell(icell, j) = l;
+            }
+          }
         }
       });
 

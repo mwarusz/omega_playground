@@ -23,6 +23,7 @@ struct PlanarHexagonalMesh {
   Int2d edges_on_cell;
   Int2d vertices_on_cell;
   Int2d edge_sign_on_cell;
+  Int2d kite_index_on_cell;
 
   Real1d area_cell;
   Real1d lat_cell;
