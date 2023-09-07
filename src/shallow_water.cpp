@@ -92,7 +92,7 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(h_drag_edge, this->h_drag_edge);
   parallel_for(
       "compute_h_edge", mesh->nedges, YAKL_LAMBDA(Int iedge) {
-        for (Int k = 0; k < max_level_edge_top(k); ++k) {
+        for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
           Real h_mean = -0;
           for (Int j = 0; j < 2; ++j) {
             Int jcell = cells_on_edge(iedge, j);
@@ -235,7 +235,7 @@ void ShallowWater::compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
   YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
   parallel_for(
       "compute_htend", mesh->ncells, YAKL_LAMBDA(Int icell) {
-        for (Int k = 0; k < max_level_cell(k); ++k) {
+        for (Int k = 0; k < max_level_cell(icell); ++k) {
           Real accum = -0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
