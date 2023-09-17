@@ -91,19 +91,18 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
   YAKL_SCOPE(h_drag_edge, this->h_drag_edge);
   parallel_for(
-      "compute_h_edge", mesh->nedges, YAKL_LAMBDA(Int iedge) {
-        for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
-          Real h_mean = -0;
-          for (Int j = 0; j < 2; ++j) {
-            Int jcell = cells_on_edge(iedge, j);
-            h_mean += h_cell(jcell, k);
-          }
-          h_mean /= 2;
-
-          h_mean_edge(iedge, k) = h_mean;
-          h_flux_edge(iedge, k) = h_mean;
-          h_drag_edge(iedge, k) = h_mean;
+      "compute_h_edge", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      YAKL_LAMBDA(Int iedge, Int k) {
+        Real h_mean = -0;
+        for (Int j = 0; j < 2; ++j) {
+          Int jcell = cells_on_edge(iedge, j);
+          h_mean += h_cell(jcell, k);
         }
+        h_mean /= 2;
+
+        h_mean_edge(iedge, k) = h_mean;
+        h_flux_edge(iedge, k) = h_mean;
+        h_drag_edge(iedge, k) = h_mean;
       });
 
   YAKL_SCOPE(dc_edge, mesh->dc_edge);
@@ -114,18 +113,17 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(rcirc_vertex, this->rcirc_vertex);
   YAKL_SCOPE(rvort_vertex, this->rvort_vertex);
   parallel_for(
-      "compute_rcirc_and_rvort_vertex", mesh->nvertices,
-      YAKL_LAMBDA(Int ivertex) {
-        for (Int k = 0; k < max_level_vertex_bot(ivertex); ++k) {
-          Real rcirc = -0;
-          for (Int j = 0; j < 3; ++j) {
-            Int jedge = edges_on_vertex(ivertex, j);
-            rcirc += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
-                     vn_edge(jedge, k);
-          }
-          rcirc_vertex(ivertex, k) = rcirc;
-          rvort_vertex(ivertex, k) = rcirc / area_triangle(ivertex);
+      "compute_rcirc_and_rvort_vertex",
+      SimpleBounds<2>(mesh->nvertices, mesh->nlayers),
+      YAKL_LAMBDA(Int ivertex, Int k) {
+        Real rcirc = -0;
+        for (Int j = 0; j < 3; ++j) {
+          Int jedge = edges_on_vertex(ivertex, j);
+          rcirc += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
+                   vn_edge(jedge, k);
         }
+        rcirc_vertex(ivertex, k) = rcirc;
+        rvort_vertex(ivertex, k) = rcirc / area_triangle(ivertex);
       });
 
   YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
@@ -140,26 +138,25 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(ke_cell, this->ke_cell);
 
   parallel_for(
-      "compute_rvort_and_ke_cell", mesh->ncells, YAKL_LAMBDA(Int icell) {
-        for (Int k = 0; k < max_level_cell(icell); ++k) {
-          Real ke = -0;
-          Real rvort = -0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
-            Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-            ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
+      "compute_rvort_and_ke_cell", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      YAKL_LAMBDA(Int icell, Int k) {
+        Real ke = -0;
+        Real rvort = -0;
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          Int jedge = edges_on_cell(icell, j);
+          Real area_edge = dv_edge(jedge) * dc_edge(jedge);
+          ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
 
-            Int jvertex = vertices_on_cell(icell, j);
-            Int jkite = kite_index_on_cell(icell, j);
-            rvort +=
-                kiteareas_on_vertex(jvertex, jkite) * rvort_vertex(jvertex, k);
-          }
-          ke /= area_cell(icell);
-          rvort /= area_cell(icell);
-
-          ke_cell(icell, k) = ke;
-          rvort_cell(icell, k) = rvort;
+          Int jvertex = vertices_on_cell(icell, j);
+          Int jkite = kite_index_on_cell(icell, j);
+          rvort +=
+              kiteareas_on_vertex(jvertex, jkite) * rvort_vertex(jvertex, k);
         }
+        ke /= area_cell(icell);
+        rvort /= area_cell(icell);
+
+        ke_cell(icell, k) = ke;
+        rvort_cell(icell, k) = rvort;
       });
 
   YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
@@ -167,15 +164,14 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
   YAKL_SCOPE(vt_edge, this->vt_edge);
   parallel_for(
-      "compute_vt_edge", mesh->nedges, YAKL_LAMBDA(Int iedge) {
-        for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
-          Real vt = -0;
-          for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
-            Int jedge = edges_on_edge(iedge, j);
-            vt += weights_on_edge(iedge, j) * vn_edge(jedge, k);
-          }
-          vt_edge(iedge, k) = vt;
+      "compute_vt_edge", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      YAKL_LAMBDA(Int iedge, Int k) {
+        Real vt = -0;
+        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+          Int jedge = edges_on_edge(iedge, j);
+          vt += weights_on_edge(iedge, j) * vn_edge(jedge, k);
         }
+        vt_edge(iedge, k) = vt;
       });
 
   YAKL_SCOPE(f_vertex, this->f_vertex);
@@ -184,18 +180,17 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(norm_f_vertex, this->norm_f_vertex);
 
   parallel_for(
-      "compute_norm_rvort_and_f_vertex", mesh->nvertices,
-      YAKL_LAMBDA(Int ivertex) {
-        for (Int k = 0; k < max_level_vertex_bot(ivertex); ++k) {
-          Real h = -0;
-          for (Int j = 0; j < 3; ++j) {
-            Int jcell = cells_on_vertex(ivertex, j);
-            h += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
-          }
-          h /= area_triangle(ivertex);
-          norm_rvort_vertex(ivertex, k) = rvort_vertex(ivertex, k) / h;
-          norm_f_vertex(ivertex, k) = f_vertex(ivertex) / h;
+      "compute_norm_rvort_and_f_vertex",
+      SimpleBounds<2>(mesh->nvertices, mesh->nlayers),
+      YAKL_LAMBDA(Int ivertex, Int k) {
+        Real h = -0;
+        for (Int j = 0; j < 3; ++j) {
+          Int jcell = cells_on_vertex(ivertex, j);
+          h += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
         }
+        h /= area_triangle(ivertex);
+        norm_rvort_vertex(ivertex, k) = rvort_vertex(ivertex, k) / h;
+        norm_f_vertex(ivertex, k) = f_vertex(ivertex) / h;
       });
 
   YAKL_SCOPE(max_level_edge_bot, mesh->max_level_edge_bot);
@@ -203,22 +198,22 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(norm_rvort_edge, this->norm_rvort_edge);
   YAKL_SCOPE(norm_f_edge, this->norm_f_edge);
   parallel_for(
-      "compute_norm_rvort_and_f_edge", mesh->nedges, YAKL_LAMBDA(Int iedge) {
-        for (Int k = 0; k < max_level_edge_bot(iedge); ++k) {
-          Real norm_f = -0;
-          Real norm_rvort = -0;
+      "compute_norm_rvort_and_f_edge",
+      SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      YAKL_LAMBDA(Int iedge, Int k) {
+        Real norm_f = -0;
+        Real norm_rvort = -0;
 
-          for (Int j = 0; j < 2; ++j) {
-            Int jvertex = vertices_on_edge(iedge, j);
-            norm_rvort += norm_rvort_vertex(jvertex, k);
-            norm_f += norm_f_vertex(jvertex, k);
-          }
-          norm_rvort /= 2;
-          norm_f /= 2;
-
-          norm_rvort_edge(iedge, k) = norm_rvort;
-          norm_f_edge(iedge, k) = norm_f;
+        for (Int j = 0; j < 2; ++j) {
+          Int jvertex = vertices_on_edge(iedge, j);
+          norm_rvort += norm_rvort_vertex(jvertex, k);
+          norm_f += norm_f_vertex(jvertex, k);
         }
+        norm_rvort /= 2;
+        norm_f /= 2;
+
+        norm_rvort_edge(iedge, k) = norm_rvort;
+        norm_f_edge(iedge, k) = norm_f;
       });
 }
 
@@ -234,22 +229,21 @@ void ShallowWater::compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
 
   YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
   parallel_for(
-      "compute_htend", mesh->ncells, YAKL_LAMBDA(Int icell) {
-        for (Int k = 0; k < max_level_cell(icell); ++k) {
-          Real accum = -0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
-            accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                     h_flux_edge(jedge, k) * vn_edge(jedge, k);
-          }
+      "compute_htend", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      YAKL_LAMBDA(Int icell, Int k) {
+        Real accum = -0;
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          Int jedge = edges_on_cell(icell, j);
+          accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                   h_flux_edge(jedge, k) * vn_edge(jedge, k);
+        }
 
-          if (add_mode == AddMode::increment) {
-            h_tend_cell(icell, k) += -accum / area_cell(icell);
-          }
+        if (add_mode == AddMode::increment) {
+          h_tend_cell(icell, k) += -accum / area_cell(icell);
+        }
 
-          if (add_mode == AddMode::replace) {
-            h_tend_cell(icell, k) = -accum / area_cell(icell);
-          }
+        if (add_mode == AddMode::replace) {
+          h_tend_cell(icell, k) = -accum / area_cell(icell);
         }
       });
 }
@@ -271,34 +265,32 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
   YAKL_SCOPE(ke_cell, this->ke_cell);
 
   parallel_for(
-      "compute_vtend", mesh->nedges, YAKL_LAMBDA(Int iedge) {
-        for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
-          Real qt = -0;
-          for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
-            Int jedge = edges_on_edge(iedge, j);
+      "compute_vtend", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      YAKL_LAMBDA(Int iedge, Int k) {
+        Real qt = -0;
+        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+          Int jedge = edges_on_edge(iedge, j);
 
-            Real norm_vort =
-                (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
-                 norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) /
-                2;
+          Real norm_vort = (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
+                            norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) /
+                           2;
 
-            qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
-                  vn_edge(jedge, k) * norm_vort;
-          }
+          qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
+                vn_edge(jedge, k) * norm_vort;
+        }
 
-          Int icell0 = cells_on_edge(iedge, 0);
-          Int icell1 = cells_on_edge(iedge, 1);
+        Int icell0 = cells_on_edge(iedge, 0);
+        Int icell1 = cells_on_edge(iedge, 1);
 
-          Real grad_B = (ke_cell(icell1, k) - ke_cell(icell0, k) +
-                         grav * (h_cell(icell1, k) - h_cell(icell0, k))) /
-                        dc_edge(iedge);
+        Real grad_B = (ke_cell(icell1, k) - ke_cell(icell0, k) +
+                       grav * (h_cell(icell1, k) - h_cell(icell0, k))) /
+                      dc_edge(iedge);
 
-          if (add_mode == AddMode::increment) {
-            vn_tend_edge(iedge, k) += qt - grad_B;
-          }
-          if (add_mode == AddMode::replace) {
-            vn_tend_edge(iedge, k) = qt - grad_B;
-          }
+        if (add_mode == AddMode::increment) {
+          vn_tend_edge(iedge, k) += qt - grad_B;
+        }
+        if (add_mode == AddMode::replace) {
+          vn_tend_edge(iedge, k) = qt - grad_B;
         }
       });
 }
@@ -357,20 +349,19 @@ void LinearShallowWater::compute_h_tendency(Real2d h_tend_cell,
   YAKL_SCOPE(h0, this->h0);
 
   parallel_for(
-      "compute_htend", mesh->ncells, YAKL_LAMBDA(Int icell) {
-        for (Int k = 0; k < max_level_cell(icell); ++k) {
-          Real accum = -0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
-            accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                     vn_edge(jedge, k);
-          }
-          if (add_mode == AddMode::increment) {
-            h_tend_cell(icell, k) += -h0 * accum / area_cell(icell);
-          }
-          if (add_mode == AddMode::replace) {
-            h_tend_cell(icell, k) = -h0 * accum / area_cell(icell);
-          }
+      "compute_htend", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      YAKL_LAMBDA(Int icell, Int k) {
+        Real accum = -0;
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          Int jedge = edges_on_cell(icell, j);
+          accum +=
+              dv_edge(jedge) * edge_sign_on_cell(icell, j) * vn_edge(jedge, k);
+        }
+        if (add_mode == AddMode::increment) {
+          h_tend_cell(icell, k) += -h0 * accum / area_cell(icell);
+        }
+        if (add_mode == AddMode::replace) {
+          h_tend_cell(icell, k) = -h0 * accum / area_cell(icell);
         }
       });
 }
@@ -390,25 +381,23 @@ void LinearShallowWater::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(f_edge, this->f_edge);
 
   parallel_for(
-      "compute_vtend", mesh->nedges, YAKL_LAMBDA(Int iedge) {
-        for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
-          Real vt = -0;
-          for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
-            Int jedge = edges_on_edge(iedge, j);
-            vt += weights_on_edge(iedge, j) * vn_edge(jedge, k);
-          }
+      "compute_vtend", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      YAKL_LAMBDA(Int iedge, Int k) {
+        Real vt = -0;
+        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+          Int jedge = edges_on_edge(iedge, j);
+          vt += weights_on_edge(iedge, j) * vn_edge(jedge, k);
+        }
 
-          Int icell0 = cells_on_edge(iedge, 0);
-          Int icell1 = cells_on_edge(iedge, 1);
-          Real grad_h =
-              (h_cell(icell1, k) - h_cell(icell0, k)) / dc_edge(iedge);
+        Int icell0 = cells_on_edge(iedge, 0);
+        Int icell1 = cells_on_edge(iedge, 1);
+        Real grad_h = (h_cell(icell1, k) - h_cell(icell0, k)) / dc_edge(iedge);
 
-          if (add_mode == AddMode::increment) {
-            vn_tend_edge(iedge, k) += f_edge(iedge) * vt - grav * grad_h;
-          }
-          if (add_mode == AddMode::replace) {
-            vn_tend_edge(iedge, k) = f_edge(iedge) * vt - grav * grad_h;
-          }
+        if (add_mode == AddMode::increment) {
+          vn_tend_edge(iedge, k) += f_edge(iedge) * vt - grav * grad_h;
+        }
+        if (add_mode == AddMode::replace) {
+          vn_tend_edge(iedge, k) = f_edge(iedge) * vt - grav * grad_h;
         }
       });
 }
