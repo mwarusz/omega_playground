@@ -59,7 +59,9 @@ Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
 
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
                            const ShallowWaterParams &params)
-    : ShallowWaterBase(mesh, params), drag_coeff(params.drag_coeff),
+    : ShallowWaterBase(mesh, params),
+      drag_coeff(params.drag_coeff),
+      visc_del2(params.visc_del2),
       h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
       h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
       h_drag_edge("h_drag_edge", mesh.nedges, mesh.nlayers),
@@ -254,7 +256,9 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
   YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
   YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
   YAKL_SCOPE(dc_edge, mesh->dc_edge);
+  YAKL_SCOPE(dv_edge, mesh->dv_edge);
   YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
+  YAKL_SCOPE(vertices_on_edge, mesh->vertices_on_edge);
 
   YAKL_SCOPE(grav, this->grav);
   YAKL_SCOPE(norm_rvort_edge, this->norm_rvort_edge);
@@ -262,7 +266,10 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
   YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
   YAKL_SCOPE(h_drag_edge, this->h_drag_edge);
   YAKL_SCOPE(ke_cell, this->ke_cell);
+  YAKL_SCOPE(div_cell, this->div_cell);
+  YAKL_SCOPE(rvort_vertex, this->rvort_vertex);
   YAKL_SCOPE(drag_coeff, this->drag_coeff);
+  YAKL_SCOPE(visc_del2, this->visc_del2);
 
   parallel_for(
       "compute_vtend", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
@@ -296,7 +303,13 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                                     vn_edge(iedge, k) / h_drag_edge(iedge, k)
                               : 0;
 
-        vn_tend = qt - grad_B + drag_force;
+        Int ivertex0 = vertices_on_edge(iedge, 0);
+        Int ivertex1 = vertices_on_edge(iedge, 1);
+        // TODO: add mesh scaling
+        Real visc2 = visc_del2 * ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
+                                  (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) / dv_edge(iedge));
+
+        vn_tend = qt - grad_B + drag_force + visc2;
         if (add_mode == AddMode::increment) {
           vn_tend_edge(iedge, k) += vn_tend;
         }
