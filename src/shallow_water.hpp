@@ -57,6 +57,7 @@ struct ShallowWaterBase {
 };
 
 struct ShallowWater : ShallowWaterBase {
+  Real drag_coeff;
   Real2d h_flux_edge;
   Real2d h_mean_edge;
   Real2d h_drag_edge;

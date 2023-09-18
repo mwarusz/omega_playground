@@ -64,7 +64,7 @@ Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
 // Nonlinear
 
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav)
-    : ShallowWaterBase(mesh, f0, grav),
+    : ShallowWaterBase(mesh, f0, grav), drag_coeff(0),
       h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
       h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
       h_drag_edge("h_drag_edge", mesh.nedges, mesh.nlayers),
@@ -262,11 +262,15 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
   YAKL_SCOPE(norm_rvort_edge, this->norm_rvort_edge);
   YAKL_SCOPE(norm_f_edge, this->norm_f_edge);
   YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
+  YAKL_SCOPE(h_drag_edge, this->h_drag_edge);
   YAKL_SCOPE(ke_cell, this->ke_cell);
+  YAKL_SCOPE(drag_coeff, this->drag_coeff);
 
   parallel_for(
       "compute_vtend", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
+        Real vn_tend = -0;
+
         Real qt = -0;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
           Int jedge = edges_on_edge(iedge, j);
@@ -282,15 +286,22 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
         Int icell0 = cells_on_edge(iedge, 0);
         Int icell1 = cells_on_edge(iedge, 1);
 
-        Real grad_B = (ke_cell(icell1, k) - ke_cell(icell0, k) +
+        Real ke_cell0 = ke_cell(icell0, k);
+        Real ke_cell1 = ke_cell(icell1, k);
+
+        Real grad_B = (ke_cell1 - ke_cell0 +
                        grav * (h_cell(icell1, k) - h_cell(icell0, k))) /
                       dc_edge(iedge);
 
+        Real drag_force = -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
+                          vn_edge(iedge, k) / h_drag_edge(iedge, k);
+
+        vn_tend = qt - grad_B + drag_force;
         if (add_mode == AddMode::increment) {
-          vn_tend_edge(iedge, k) += qt - grad_B;
+          vn_tend_edge(iedge, k) += vn_tend;
         }
         if (add_mode == AddMode::replace) {
-          vn_tend_edge(iedge, k) = qt - grad_B;
+          vn_tend_edge(iedge, k) = vn_tend;
         }
       });
 }
