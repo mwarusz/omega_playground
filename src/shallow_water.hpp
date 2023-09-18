@@ -26,10 +26,10 @@ struct ShallowWaterBase {
   virtual void compute_auxiliary_variables(RealConst2d h_cell,
                                            RealConst2d vn_edge) const {}
 
-  virtual void compute_h_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
+  virtual void compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
                                   RealConst2d vn_edge,
                                   AddMode add_mode) const = 0;
-  virtual void compute_vn_tendency(Real2d h_tend_cell, RealConst2d h_cell,
+  virtual void compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                                    RealConst2d vn_edge,
                                    AddMode add_mode) const = 0;
   virtual void additional_tendency(Real2d h_tend_cell, Real2d vn_tend_edge,
@@ -87,9 +87,9 @@ struct ShallowWater : ShallowWaterBase {
   void compute_auxiliary_variables(RealConst2d h_cell,
                                    RealConst2d vn_edge) const override;
 
-  void compute_h_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
+  void compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
                           RealConst2d vn_edge, AddMode add_mode) const override;
-  void compute_vn_tendency(Real2d h_tend_cell, RealConst2d h_cell,
+  void compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                            RealConst2d vn_edge,
                            AddMode add_mode) const override;
   Real energy_integral(RealConst2d h, RealConst2d v) const override;
@@ -99,9 +99,9 @@ struct ShallowWater : ShallowWaterBase {
 
 struct LinearShallowWater : ShallowWaterBase {
   Real h0;
-  void compute_h_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
+  void compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
                           RealConst2d vn_edge, AddMode add_mode) const override;
-  void compute_vn_tendency(Real2d h_tend_cell, RealConst2d h_cell,
+  void compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                            RealConst2d vn_edge,
                            AddMode add_mode) const override;
   Real energy_integral(RealConst2d h_cell, RealConst2d vn_edge) const override;
