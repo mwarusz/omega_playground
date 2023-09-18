@@ -76,6 +76,7 @@ struct ShallowWater : ShallowWaterBase {
 
   Real2d rvort_cell;
   Real2d ke_cell;
+  Real2d div_cell;
   Real2d vt_edge;
 
   Real2d norm_rvort_vertex;

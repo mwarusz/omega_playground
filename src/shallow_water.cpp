@@ -67,6 +67,7 @@ ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
       rvort_vertex("rvort_vertex", mesh.nvertices, mesh.nlayers),
       rvort_cell("rvort_cell", mesh.ncells, mesh.nlayers),
       ke_cell("ke_cell", mesh.ncells, mesh.nlayers),
+      div_cell("div_cell", mesh.ncells, mesh.nlayers),
       vt_edge("vt_edge", mesh.nedges, mesh.nlayers),
       norm_rvort_vertex("norm_rvort_vertex", mesh.nvertices, mesh.nlayers),
       norm_f_vertex("norm_f_vertex", mesh.nvertices, mesh.nlayers),
@@ -128,16 +129,19 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(area_cell, mesh->area_cell);
   YAKL_SCOPE(rvort_cell, this->rvort_cell);
   YAKL_SCOPE(ke_cell, this->ke_cell);
+  YAKL_SCOPE(div_cell, this->div_cell);
 
   parallel_for(
-      "compute_rvort_and_ke_cell", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      "compute_auxiliarys_cell", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real ke = -0;
         Real rvort = -0;
+        Real div = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
           Int jedge = edges_on_cell(icell, j);
           Real area_edge = dv_edge(jedge) * dc_edge(jedge);
           ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
+          div += dv_edge(jedge) * vn_edge(jedge, k);
 
           Int jvertex = vertices_on_cell(icell, j);
           Int jkite = kite_index_on_cell(icell, j);
@@ -145,8 +149,10 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
               kiteareas_on_vertex(jvertex, jkite) * rvort_vertex(jvertex, k);
         }
         ke /= area_cell(icell);
+        div /= area_cell(icell);
         rvort /= area_cell(icell);
 
+        div_cell(icell, k) = div;
         ke_cell(icell, k) = ke;
         rvort_cell(icell, k) = rvort;
       });
