@@ -285,8 +285,10 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
                        grav * (h_cell(icell1, k) - h_cell(icell0, k))) /
                       dc_edge(iedge);
 
-        Real drag_force = -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
-                          vn_edge(iedge, k) / h_drag_edge(iedge, k);
+        Real drag_force = (k == (max_level_edge_top(iedge) - 1))
+                              ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
+                                    vn_edge(iedge, k) / h_drag_edge(iedge, k)
+                              : 0;
 
         vn_tend = qt - grad_B + drag_force;
         if (add_mode == AddMode::increment) {
