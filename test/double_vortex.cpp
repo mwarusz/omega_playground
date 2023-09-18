@@ -97,7 +97,10 @@ void run(Int nx, Real cfl) {
   Int ny = std::ceil(double_vortex.ly / (dc * std::sqrt(3) / 2));
   PlanarHexagonalMesh mesh(nx, ny, dc);
 
-  ShallowWater shallow_water(mesh, double_vortex.coriolis, double_vortex.g);
+  ShallowWaterParams params;
+  params.f0 = double_vortex.coriolis;
+  params.grav = double_vortex.g;
+  ShallowWater shallow_water(mesh, params);
 
   LSRKStepper stepper(shallow_water);
 

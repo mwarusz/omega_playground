@@ -42,9 +42,12 @@ Real run(Int nx) {
   InertiaGravityWave inertia_gravity_wave;
 
   PlanarHexagonalMesh mesh(nx, nx, inertia_gravity_wave.lx / nx, 1);
-  LinearShallowWater shallow_water(mesh, inertia_gravity_wave.h0,
-                                   inertia_gravity_wave.f0,
-                                   inertia_gravity_wave.grav);
+
+  LinearShallowWaterParams params;
+  params.h0 = inertia_gravity_wave.h0;
+  params.f0 = inertia_gravity_wave.f0;
+  params.grav = inertia_gravity_wave.grav;
+  LinearShallowWater shallow_water(mesh, params);
   RK4Stepper stepper(shallow_water);
 
   Real timeend = 10 * 60 * 60;

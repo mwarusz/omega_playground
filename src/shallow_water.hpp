@@ -7,6 +7,16 @@ namespace omega {
 
 enum class AddMode { replace, increment };
 
+struct ShallowWaterParams {
+  Real f0;
+  Real grav = 9.81;
+  Real drag_coeff = 0;
+};
+
+struct LinearShallowWaterParams : ShallowWaterParams {
+  Real h0;
+};
+
 struct ShallowWaterBase {
   PlanarHexagonalMesh *mesh;
   Real grav;
@@ -52,8 +62,7 @@ struct ShallowWaterBase {
     yakl::timer_stop("compute_tendency");
   }
 
-  ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0);
-  ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0, Real grav);
+  ShallowWaterBase(PlanarHexagonalMesh &mesh, const ShallowWaterParams &params);
 };
 
 struct ShallowWater : ShallowWaterBase {
@@ -85,8 +94,7 @@ struct ShallowWater : ShallowWaterBase {
                            AddMode add_mode) const override;
   Real energy_integral(RealConst2d h, RealConst2d v) const override;
 
-  ShallowWater(PlanarHexagonalMesh &mesh, Real f0);
-  ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav);
+  ShallowWater(PlanarHexagonalMesh &mesh, const ShallowWaterParams &params);
 };
 
 struct LinearShallowWater : ShallowWaterBase {
@@ -98,7 +106,7 @@ struct LinearShallowWater : ShallowWaterBase {
                            AddMode add_mode) const override;
   Real energy_integral(RealConst2d h_cell, RealConst2d vn_edge) const override;
 
-  LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0);
-  LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0, Real f0, Real grav);
+  LinearShallowWater(PlanarHexagonalMesh &mesh,
+                     const LinearShallowWaterParams &params);
 };
 } // namespace omega

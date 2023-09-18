@@ -66,8 +66,8 @@ struct ManufacturedShallowWater : ShallowWater {
 
   ManufacturedShallowWater(PlanarHexagonalMesh &mesh,
                            const ManufacturedSolution &manufactured_solution)
-      : ShallowWater(mesh, manufactured_solution.f0,
-                     manufactured_solution.grav),
+      : ShallowWater(mesh, ShallowWaterParams{manufactured_solution.f0,
+                                              manufactured_solution.grav, 0}),
         manufactured_solution(manufactured_solution) {}
 
   void additional_tendency(Real2d h_tend_cell, Real2d vn_tend_edge,

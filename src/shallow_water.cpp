@@ -4,18 +4,12 @@ namespace omega {
 
 // Base
 
-ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0)
-    : mesh(&mesh), f_vertex("f_vertex", mesh.nvertices),
+ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh,
+                                   const ShallowWaterParams &params)
+    : mesh(&mesh), f_vertex("f_vertex", mesh.nvertices), grav(params.grav),
       f_edge("f_edge", mesh.nedges) {
-  yakl::memset(f_vertex, f0);
-  yakl::memset(f_edge, f0);
-}
-ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh, Real f0,
-                                   Real grav)
-    : mesh(&mesh), f_vertex("f_vertex", mesh.nvertices),
-      f_edge("f_edge", mesh.nedges), grav(grav) {
-  yakl::memset(f_vertex, f0);
-  yakl::memset(f_edge, f0);
+  yakl::memset(f_vertex, params.f0);
+  yakl::memset(f_edge, params.f0);
 }
 
 Real ShallowWaterBase::mass_integral(RealConst2d h_cell) const {
@@ -63,8 +57,9 @@ Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
 
 // Nonlinear
 
-ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav)
-    : ShallowWaterBase(mesh, f0, grav), drag_coeff(0),
+ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
+                           const ShallowWaterParams &params)
+    : ShallowWaterBase(mesh, params), drag_coeff(params.drag_coeff),
       h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
       h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
       h_drag_edge("h_drag_edge", mesh.nedges, mesh.nlayers),
@@ -78,9 +73,6 @@ ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0, Real grav)
       norm_rvort_edge("norm_rvort_edge", mesh.nedges, mesh.nlayers),
       norm_f_edge("norm_f_edge", mesh.nedges, mesh.nlayers),
       norm_rvort_cell("norm_rvort_cell", mesh.ncells, mesh.nlayers) {}
-
-ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh, Real f0)
-    : ShallowWater(mesh, f0, 9.81) {}
 
 void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
                                                RealConst2d vn_edge) const {
@@ -339,13 +331,9 @@ Real ShallowWater::energy_integral(RealConst2d h_cell,
 
 // Linear
 
-LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0,
-                                       Real f0, Real grav)
-    : ShallowWaterBase(mesh, f0, grav), h0(h0) {}
-
-LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh, Real h0,
-                                       Real f0)
-    : LinearShallowWater(mesh, h0, f0, 9.81) {}
+LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh,
+                                       const LinearShallowWaterParams &params)
+    : ShallowWaterBase(mesh, params), h0(params.h0) {}
 
 void LinearShallowWater::compute_h_tendency(Real2d h_tend_cell,
                                             RealConst2d h_cell,
