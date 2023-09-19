@@ -93,14 +93,18 @@ struct DoubleVortex {
 
 void run(Int nx, Real cfl) {
   DoubleVortex double_vortex;
+
   Real dc = double_vortex.lx / nx;
   Int ny = std::ceil(double_vortex.ly / (dc * std::sqrt(3) / 2));
   PlanarHexagonalMesh mesh(nx, ny, dc);
 
+  ShallowWaterState state(mesh);
+
   ShallowWaterParams params;
   params.f0 = double_vortex.coriolis;
   params.grav = double_vortex.g;
-  ShallowWater shallow_water(mesh, params);
+
+  ShallowWaterModel shallow_water(mesh, state, params);
 
   LSRKStepper stepper(shallow_water);
 
@@ -109,10 +113,7 @@ void run(Int nx, Real cfl) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  ShallowWaterState state(mesh);
   auto &h_cell = state.h_cell;
-  auto &vn_edge = state.vn_edge;
-
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
@@ -121,6 +122,7 @@ void run(Int nx, Real cfl) {
         h_cell(icell, k) = double_vortex.h(x, y);
       });
 
+  auto &vn_edge = state.vn_edge;
   parallel_for(
       "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {

@@ -47,7 +47,11 @@ Real run(Int nx) {
   params.h0 = inertia_gravity_wave.h0;
   params.f0 = inertia_gravity_wave.f0;
   params.grav = inertia_gravity_wave.grav;
-  LinearShallowWater shallow_water(mesh, params);
+
+  ShallowWaterState state(mesh);
+
+  LinearShallowWaterModel shallow_water(mesh, state, params);
+
   RK4Stepper stepper(shallow_water);
 
   Real timeend = 10 * 60 * 60;
@@ -56,11 +60,8 @@ Real run(Int nx) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  ShallowWaterState state(mesh);
   auto &h_cell = state.h_cell;
-  auto &vn_edge = state.vn_edge;
   Real2d hexact_cell("hexact_cell", mesh.ncells, mesh.nlayers);
-
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
@@ -70,6 +71,7 @@ Real run(Int nx) {
         hexact_cell(icell, k) = inertia_gravity_wave.h(x, y, timeend);
       });
 
+  auto &vn_edge = state.vn_edge;
   parallel_for(
       "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {

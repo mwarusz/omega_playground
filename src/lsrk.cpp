@@ -2,7 +2,7 @@
 
 namespace omega {
 
-LSRKStepper::LSRKStepper(ShallowWaterBase &shallow_water)
+LSRKStepper::LSRKStepper(ShallowWaterModelBase &shallow_water)
     : TimeStepper(shallow_water), rka(nstages), rkb(nstages), rkc(nstages),
       tend(*shallow_water.mesh) {
 

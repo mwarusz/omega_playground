@@ -2,21 +2,25 @@
 
 namespace omega {
 
-ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh)
+ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
+                                     Int ntracers)
     : h_cell("h_cell", mesh.ncells, mesh.nlayers),
-      vn_edge("vn_edge", mesh.nedges, mesh.nlayers) {}
+      vn_edge("vn_edge", mesh.nedges, mesh.nlayers),
+      tr_cell("tr_cell", ntracers, mesh.nedges, mesh.nlayers),
+      ntracers(ntracers) {}
 
 // Base
 
-ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh,
-                                   const ShallowWaterParams &params)
+ShallowWaterModelBase::ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
+                                             const ShallowWaterState &state,
+                                             const ShallowWaterParams &params)
     : mesh(&mesh), f_vertex("f_vertex", mesh.nvertices), grav(params.grav),
       f_edge("f_edge", mesh.nedges) {
   yakl::memset(f_vertex, params.f0);
   yakl::memset(f_edge, params.f0);
 }
 
-Real ShallowWaterBase::mass_integral(RealConst2d h_cell) const {
+Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
   Real1d column_mass("column_mass", mesh->ncells);
 
   YAKL_SCOPE(area_cell, mesh->area_cell);
@@ -32,7 +36,7 @@ Real ShallowWaterBase::mass_integral(RealConst2d h_cell) const {
   return yakl::intrinsics::sum(column_mass);
 }
 
-Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
+Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
   Real1d column_circulation("column_circulation", mesh->nvertices);
 
   YAKL_SCOPE(dc_edge, mesh->dc_edge);
@@ -61,9 +65,10 @@ Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
 
 // Nonlinear
 
-ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
-                           const ShallowWaterParams &params)
-    : ShallowWaterBase(mesh, params), drag_coeff(params.drag_coeff),
+ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
+                                     const ShallowWaterState &state,
+                                     const ShallowWaterParams &params)
+    : ShallowWaterModelBase(mesh, state, params), drag_coeff(params.drag_coeff),
       visc_del2(params.visc_del2),
       h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
       h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
@@ -71,6 +76,7 @@ ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
       rcirc_vertex("rcirc_vertex", mesh.nvertices, mesh.nlayers),
       rvort_vertex("rvort_vertex", mesh.nvertices, mesh.nlayers),
       rvort_cell("rvort_cell", mesh.ncells, mesh.nlayers),
+      norm_tr_cell("norm_tr_cell", state.ntracers, mesh.ncells, mesh.nlayers),
       ke_cell("ke_cell", mesh.ncells, mesh.nlayers),
       div_cell("div_cell", mesh.ncells, mesh.nlayers),
       vt_edge("vt_edge", mesh.nedges, mesh.nlayers),
@@ -80,8 +86,9 @@ ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
       norm_f_edge("norm_f_edge", mesh.nedges, mesh.nlayers),
       norm_rvort_cell("norm_rvort_cell", mesh.ncells, mesh.nlayers) {}
 
-void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
-                                               RealConst2d vn_edge) const {
+void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
+                                                    RealConst2d vn_edge,
+                                                    RealConst3d tr_cell) const {
 
   YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
   YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
@@ -135,6 +142,8 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(rvort_cell, this->rvort_cell);
   YAKL_SCOPE(ke_cell, this->ke_cell);
   YAKL_SCOPE(div_cell, this->div_cell);
+  YAKL_SCOPE(norm_tr_cell, this->norm_tr_cell);
+  Int ntracers = tr_cell.dimension[0];
 
   parallel_for(
       "compute_auxiliarys_cell", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
@@ -160,6 +169,10 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
         div_cell(icell, k) = div;
         ke_cell(icell, k) = ke;
         rvort_cell(icell, k) = rvort;
+
+        for (Int l = 0; l < ntracers; ++l) {
+          norm_tr_cell(l, icell, k) = tr_cell(l, icell, k) / h_cell(icell, k);
+        }
       });
 
   YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
@@ -220,9 +233,10 @@ void ShallowWater::compute_auxiliary_variables(RealConst2d h_cell,
       });
 }
 
-void ShallowWater::compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
-                                      RealConst2d vn_edge,
-                                      AddMode add_mode) const {
+void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
+                                           RealConst2d h_cell,
+                                           RealConst2d vn_edge,
+                                           AddMode add_mode) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
@@ -251,9 +265,10 @@ void ShallowWater::compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
       });
 }
 
-void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
-                                       RealConst2d vn_edge,
-                                       AddMode add_mode) const {
+void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
+                                            RealConst2d h_cell,
+                                            RealConst2d vn_edge,
+                                            AddMode add_mode) const {
   YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
   YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
   YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
@@ -325,8 +340,49 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
       });
 }
 
-Real ShallowWater::energy_integral(RealConst2d h_cell,
-                                   RealConst2d vn_edge) const {
+void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
+                                            RealConst3d tr_cell,
+                                            RealConst2d vn_edge,
+                                            AddMode add_mode) const {
+  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
+  YAKL_SCOPE(dv_edge, mesh->dv_edge);
+  YAKL_SCOPE(edge_sign_on_cell, mesh->edge_sign_on_cell);
+  YAKL_SCOPE(area_cell, mesh->area_cell);
+  YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
+
+  YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
+  YAKL_SCOPE(norm_tr_cell, this->norm_tr_cell);
+  Int ntracers = tr_cell.dimension[0];
+  parallel_for(
+      "compute_htend", SimpleBounds<3>(ntracers, mesh->ncells, mesh->nlayers),
+      YAKL_LAMBDA(Int l, Int icell, Int k) {
+        Real accum = -0;
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          Int jedge = edges_on_cell(icell, j);
+
+          Int jcell0 = cells_on_edge(jedge, 0);
+          Int jcell1 = cells_on_edge(jedge, 1);
+
+          Real norm_tr_edge =
+              (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) / 2;
+
+          accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                   h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
+        }
+
+        if (add_mode == AddMode::increment) {
+          tr_tend_cell(l, icell, k) += -accum / area_cell(icell);
+        }
+
+        if (add_mode == AddMode::replace) {
+          tr_tend_cell(l, icell, k) = -accum / area_cell(icell);
+        }
+      });
+}
+
+Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
+                                        RealConst2d vn_edge) const {
   Real1d column_energy("column_energy", mesh->ncells);
 
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
@@ -358,14 +414,15 @@ Real ShallowWater::energy_integral(RealConst2d h_cell,
 
 // Linear
 
-LinearShallowWater::LinearShallowWater(PlanarHexagonalMesh &mesh,
-                                       const LinearShallowWaterParams &params)
-    : ShallowWaterBase(mesh, params), h0(params.h0) {}
+LinearShallowWaterModel::LinearShallowWaterModel(
+    PlanarHexagonalMesh &mesh, const ShallowWaterState &state,
+    const LinearShallowWaterParams &params)
+    : ShallowWaterModelBase(mesh, state, params), h0(params.h0) {}
 
-void LinearShallowWater::compute_h_tendency(Real2d h_tend_cell,
-                                            RealConst2d h_cell,
-                                            RealConst2d vn_edge,
-                                            AddMode add_mode) const {
+void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
+                                                 RealConst2d h_cell,
+                                                 RealConst2d vn_edge,
+                                                 AddMode add_mode) const {
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
   YAKL_SCOPE(dv_edge, mesh->dv_edge);
@@ -392,10 +449,10 @@ void LinearShallowWater::compute_h_tendency(Real2d h_tend_cell,
       });
 }
 
-void LinearShallowWater::compute_vn_tendency(Real2d vn_tend_edge,
-                                             RealConst2d h_cell,
-                                             RealConst2d vn_edge,
-                                             AddMode add_mode) const {
+void LinearShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
+                                                  RealConst2d h_cell,
+                                                  RealConst2d vn_edge,
+                                                  AddMode add_mode) const {
   YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
   YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
   YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
@@ -428,8 +485,8 @@ void LinearShallowWater::compute_vn_tendency(Real2d vn_tend_edge,
       });
 }
 
-Real LinearShallowWater::energy_integral(RealConst2d h_cell,
-                                         RealConst2d vn_edge) const {
+Real LinearShallowWaterModel::energy_integral(RealConst2d h_cell,
+                                              RealConst2d vn_edge) const {
   Real1d column_energy("column_energy", mesh->ncells);
 
   YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);

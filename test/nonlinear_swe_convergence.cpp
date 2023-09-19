@@ -61,13 +61,15 @@ struct ManufacturedSolution {
   }
 };
 
-struct ManufacturedShallowWater : ShallowWater {
+struct ManufacturedShallowWaterModel : ShallowWaterModel {
   ManufacturedSolution manufactured_solution;
 
-  ManufacturedShallowWater(PlanarHexagonalMesh &mesh,
-                           const ManufacturedSolution &manufactured_solution)
-      : ShallowWater(mesh, ShallowWaterParams{manufactured_solution.f0,
-                                              manufactured_solution.grav, 0}),
+  ManufacturedShallowWaterModel(
+      PlanarHexagonalMesh &mesh, const ShallowWaterState &state,
+      const ManufacturedSolution &manufactured_solution)
+      : ShallowWaterModel(mesh, state,
+                          ShallowWaterParams{manufactured_solution.f0,
+                                             manufactured_solution.grav, 0}),
         manufactured_solution(manufactured_solution) {}
 
   void additional_tendency(Real2d h_tend_cell, Real2d vn_tend_edge,
@@ -114,8 +116,14 @@ struct ManufacturedShallowWater : ShallowWater {
 
 Real run(Int n) {
   ManufacturedSolution manufactured_solution;
+
   PlanarHexagonalMesh mesh(n, n, manufactured_solution.lx / n);
-  ManufacturedShallowWater shallow_water(mesh, manufactured_solution);
+
+  ShallowWaterState state(mesh);
+
+  ManufacturedShallowWaterModel shallow_water(mesh, state,
+                                              manufactured_solution);
+
   RK4Stepper stepper(shallow_water);
 
   Real timeend = 10 * 60 * 60;
@@ -124,11 +132,8 @@ Real run(Int n) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  ShallowWaterState state(mesh);
   auto &h_cell = state.h_cell;
-  auto &vn_edge = state.vn_edge;
   Real2d hexact_cell("hexact_cell", mesh.ncells, mesh.nlayers);
-
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
@@ -138,6 +143,7 @@ Real run(Int n) {
         hexact_cell(icell, k) = manufactured_solution.h(x, y, timeend);
       });
 
+  auto &vn_edge = state.vn_edge;
   parallel_for(
       "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {

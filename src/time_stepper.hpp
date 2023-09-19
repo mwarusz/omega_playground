@@ -6,10 +6,10 @@
 namespace omega {
 
 struct TimeStepper {
-  ShallowWaterBase *shallow_water;
+  ShallowWaterModelBase *shallow_water;
   virtual void do_step(Real t, Real dt,
                        const ShallowWaterState &state) const = 0;
-  TimeStepper(ShallowWaterBase &shallow_water)
+  TimeStepper(ShallowWaterModelBase &shallow_water)
       : shallow_water(&shallow_water) {}
 };
 
@@ -20,7 +20,7 @@ struct LSRKStepper : TimeStepper {
   std::vector<Real> rkc;
   ShallowWaterState tend;
 
-  LSRKStepper(ShallowWaterBase &shallow_water);
+  LSRKStepper(ShallowWaterModelBase &shallow_water);
   void do_step(Real t, Real dt, const ShallowWaterState &state) const override;
 };
 
@@ -33,7 +33,7 @@ struct RK4Stepper : TimeStepper {
   ShallowWaterState provis_state;
   ShallowWaterState old_state;
 
-  RK4Stepper(ShallowWaterBase &shallow_water);
+  RK4Stepper(ShallowWaterModelBase &shallow_water);
   void do_step(Real t, Real dt, const ShallowWaterState &state) const override;
 };
 } // namespace omega
