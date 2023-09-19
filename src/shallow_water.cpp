@@ -14,8 +14,10 @@ ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
 ShallowWaterModelBase::ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
                                              const ShallowWaterState &state,
                                              const ShallowWaterParams &params)
-    : mesh(&mesh), f_vertex("f_vertex", mesh.nvertices), grav(params.grav),
-      f_edge("f_edge", mesh.nedges) {
+    : mesh(&mesh), grav(params.grav),
+      disable_h_tendency(params.disable_h_tendency),
+      disable_vn_tendency(params.disable_vn_tendency),
+      f_vertex("f_vertex", mesh.nvertices), f_edge("f_edge", mesh.nedges) {
   yakl::memset(f_vertex, params.f0);
   yakl::memset(f_edge, params.f0);
 }

@@ -21,6 +21,8 @@ struct ShallowWaterParams {
   Real grav = 9.81;
   Real drag_coeff = 0;
   Real visc_del2 = 0;
+  bool disable_h_tendency = false;
+  bool disable_vn_tendency = false;
 };
 
 struct LinearShallowWaterParams : ShallowWaterParams {
@@ -30,6 +32,8 @@ struct LinearShallowWaterParams : ShallowWaterParams {
 struct ShallowWaterModelBase {
   PlanarHexagonalMesh *mesh;
   Real grav;
+  bool disable_h_tendency;
+  bool disable_vn_tendency;
   Real1d f_vertex;
   Real1d f_edge;
 
@@ -64,19 +68,25 @@ struct ShallowWaterModelBase {
     yakl::timer_stop("compute_auxiliary_variables");
 
     yakl::timer_start("h_tendency");
-    compute_h_tendency(tend.h_cell, state.h_cell, state.vn_edge, add_mode);
+    if (!disable_h_tendency) {
+      compute_h_tendency(tend.h_cell, state.h_cell, state.vn_edge, add_mode);
+    }
     yakl::timer_stop("h_tendency");
 
     yakl::timer_start("vn_tendency");
-    compute_vn_tendency(tend.vn_edge, state.h_cell, state.vn_edge, add_mode);
+    if (!disable_vn_tendency) {
+      compute_vn_tendency(tend.vn_edge, state.h_cell, state.vn_edge, add_mode);
+    }
     yakl::timer_stop("vn_tendency");
 
     yakl::timer_start("tr_tendency");
     compute_tr_tendency(tend.tr_cell, state.tr_cell, state.vn_edge, add_mode);
     yakl::timer_stop("tr_tendency");
 
+    yakl::timer_start("additional_tendency");
     additional_tendency(tend.h_cell, tend.vn_edge, state.h_cell, state.vn_edge,
                         t);
+    yakl::timer_stop("additional_tendency");
 
     yakl::timer_stop("compute_tendency");
   }
