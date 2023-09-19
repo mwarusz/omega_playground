@@ -7,7 +7,8 @@ namespace omega {
 
 struct TimeStepper {
   ShallowWaterBase *shallow_water;
-  virtual void do_step(Real t, Real dt, Real2d h, Real2d v) const = 0;
+  virtual void do_step(Real t, Real dt,
+                       const ShallowWaterState &state) const = 0;
   TimeStepper(ShallowWaterBase &shallow_water)
       : shallow_water(&shallow_water) {}
 };
@@ -17,11 +18,10 @@ struct LSRKStepper : TimeStepper {
   std::vector<Real> rka;
   std::vector<Real> rkb;
   std::vector<Real> rkc;
-  Real2d htend;
-  Real2d vtend;
+  ShallowWaterState tend;
 
   LSRKStepper(ShallowWaterBase &shallow_water);
-  void do_step(Real t, Real dt, Real2d h, Real2d v) const override;
+  void do_step(Real t, Real dt, const ShallowWaterState &state) const override;
 };
 
 struct RK4Stepper : TimeStepper {
@@ -29,14 +29,11 @@ struct RK4Stepper : TimeStepper {
   std::vector<Real> rka;
   std::vector<Real> rkb;
   std::vector<Real> rkc;
-  Real2d htend;
-  Real2d vtend;
-  Real2d hprovis;
-  Real2d vprovis;
-  Real2d hold;
-  Real2d vold;
+  ShallowWaterState tend;
+  ShallowWaterState provis_state;
+  ShallowWaterState old_state;
 
   RK4Stepper(ShallowWaterBase &shallow_water);
-  void do_step(Real t, Real dt, Real2d h, Real2d v) const override;
+  void do_step(Real t, Real dt, const ShallowWaterState &state) const override;
 };
 } // namespace omega

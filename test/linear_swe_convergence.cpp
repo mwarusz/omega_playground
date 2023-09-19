@@ -56,9 +56,10 @@ Real run(Int nx) {
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  Real2d h_cell("h_cell", mesh.ncells, mesh.nlayers);
+  ShallowWaterState state(mesh);
+  auto &h_cell = state.h_cell;
+  auto &vn_edge = state.vn_edge;
   Real2d hexact_cell("hexact_cell", mesh.ncells, mesh.nlayers);
-  Real2d vn_edge("vn_edge", mesh.nedges, mesh.nlayers);
 
   parallel_for(
       "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
@@ -83,7 +84,7 @@ Real run(Int nx) {
 
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
-    stepper.do_step(t, dt, h_cell, vn_edge);
+    stepper.do_step(t, dt, state);
   }
 
   parallel_for(

@@ -2,6 +2,10 @@
 
 namespace omega {
 
+ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh)
+    : h_cell("h_cell", mesh.ncells, mesh.nlayers),
+      vn_edge("vn_edge", mesh.nedges, mesh.nlayers) {}
+
 // Base
 
 ShallowWaterBase::ShallowWaterBase(PlanarHexagonalMesh &mesh,
@@ -59,8 +63,7 @@ Real ShallowWaterBase::circulation_integral(RealConst2d vn_edge) const {
 
 ShallowWater::ShallowWater(PlanarHexagonalMesh &mesh,
                            const ShallowWaterParams &params)
-    : ShallowWaterBase(mesh, params),
-      drag_coeff(params.drag_coeff),
+    : ShallowWaterBase(mesh, params), drag_coeff(params.drag_coeff),
       visc_del2(params.visc_del2),
       h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
       h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
@@ -306,8 +309,11 @@ void ShallowWater::compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,
         Int ivertex0 = vertices_on_edge(iedge, 0);
         Int ivertex1 = vertices_on_edge(iedge, 1);
         // TODO: add mesh scaling
-        Real visc2 = visc_del2 * ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
-                                  (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) / dv_edge(iedge));
+        Real visc2 =
+            visc_del2 *
+            ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
+             (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) /
+                 dv_edge(iedge));
 
         vn_tend = qt - grad_B + drag_force + visc2;
         if (add_mode == AddMode::increment) {

@@ -7,15 +7,8 @@ namespace omega {
 
 RK4Stepper::RK4Stepper(ShallowWaterBase &shallow_water)
     : TimeStepper(shallow_water), rka(nstages - 1), rkb(nstages),
-      rkc(nstages - 1),
-      htend("htend", shallow_water.mesh->ncells, shallow_water.mesh->nlayers),
-      vtend("vtend", shallow_water.mesh->nedges, shallow_water.mesh->nlayers),
-      hprovis("hprovis", shallow_water.mesh->ncells,
-              shallow_water.mesh->nlayers),
-      vprovis("vprovis", shallow_water.mesh->nedges,
-              shallow_water.mesh->nlayers),
-      hold("hold", shallow_water.mesh->ncells, shallow_water.mesh->nlayers),
-      vold("vold", shallow_water.mesh->nedges, shallow_water.mesh->nlayers) {
+      rkc(nstages - 1), tend(*shallow_water.mesh),
+      provis_state(*shallow_water.mesh), old_state(*shallow_water.mesh) {
 
   rka[0] = 1. / 2;
   rka[1] = 1. / 2;
@@ -31,23 +24,24 @@ RK4Stepper::RK4Stepper(ShallowWaterBase &shallow_water)
   rkc[2] = 1;
 }
 
-void RK4Stepper::do_step(Real t, Real dt, Real2d h, Real2d v) const {
+void RK4Stepper::do_step(Real t, Real dt,
+                         const ShallowWaterState &state) const {
   auto mesh = shallow_water->mesh;
 
-  YAKL_SCOPE(hold, this->hold);
-  YAKL_SCOPE(vold, this->vold);
+  YAKL_SCOPE(h_old_cell, this->old_state.h_cell);
+  YAKL_SCOPE(vn_old_edge, this->old_state.vn_edge);
 
-  YAKL_SCOPE(htend, this->htend);
-  YAKL_SCOPE(vtend, this->vtend);
+  YAKL_SCOPE(h_tend_cell, this->tend.h_cell);
+  YAKL_SCOPE(vn_tend_edge, this->tend.vn_edge);
 
-  YAKL_SCOPE(hprovis, this->hprovis);
-  YAKL_SCOPE(vprovis, this->vprovis);
+  YAKL_SCOPE(h_provis_cell, this->provis_state.h_cell);
+  YAKL_SCOPE(vn_provis_edge, this->provis_state.vn_edge);
 
-  h.deep_copy_to(hold);
-  v.deep_copy_to(vold);
+  state.h_cell.deep_copy_to(h_old_cell);
+  state.vn_edge.deep_copy_to(vn_old_edge);
 
   // k1
-  shallow_water->compute_tendency(htend, vtend, h, v, t);
+  shallow_water->compute_tendency(tend, state, t);
 
   for (Int stage = 0; stage < nstages; ++stage) {
 
@@ -55,12 +49,12 @@ void RK4Stepper::do_step(Real t, Real dt, Real2d h, Real2d v) const {
     parallel_for(
         "rk4_accumulate_h", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
         YAKL_LAMBDA(Int icell, Int k) {
-          h(icell, k) += dt * rkb_stage * htend(icell, k);
+          state.h_cell(icell, k) += dt * rkb_stage * h_tend_cell(icell, k);
         });
     parallel_for(
         "rk4_accumulate_v", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
         YAKL_LAMBDA(Int iedge, Int k) {
-          v(iedge, k) += dt * rkb_stage * vtend(iedge, k);
+          state.vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
 
     if (stage < nstages - 1) {
@@ -70,18 +64,17 @@ void RK4Stepper::do_step(Real t, Real dt, Real2d h, Real2d v) const {
       parallel_for(
           "rk4_compute_hprovis", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
           YAKL_LAMBDA(Int icell, Int k) {
-            hprovis(icell, k) =
-                hold(icell, k) + dt * rka_stage * htend(icell, k);
+            h_provis_cell(icell, k) =
+                h_old_cell(icell, k) + dt * rka_stage * h_tend_cell(icell, k);
           });
       parallel_for(
           "rk4_compute_vprovis", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
           YAKL_LAMBDA(Int iedge, Int k) {
-            vprovis(iedge, k) =
-                vold(iedge, k) + dt * rka_stage * vtend(iedge, k);
+            vn_provis_edge(iedge, k) =
+                vn_old_edge(iedge, k) + dt * rka_stage * vn_tend_edge(iedge, k);
           });
 
-      shallow_water->compute_tendency(htend, vtend, hprovis, vprovis,
-                                      stagetime);
+      shallow_water->compute_tendency(tend, provis_state, stagetime);
     }
   }
 }

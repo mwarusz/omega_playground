@@ -7,6 +7,13 @@ namespace omega {
 
 enum class AddMode { replace, increment };
 
+struct ShallowWaterState {
+  Real2d h_cell;
+  Real2d vn_edge;
+
+  ShallowWaterState(const PlanarHexagonalMesh &mesh);
+};
+
 struct ShallowWaterParams {
   Real f0;
   Real grav = 9.81;
@@ -41,24 +48,25 @@ struct ShallowWaterBase {
   virtual Real energy_integral(RealConst2d h_cell,
                                RealConst2d vn_edge) const = 0;
 
-  void compute_tendency(Real2d h_tend_cell, Real2d vn_tend_edge,
-                        RealConst2d h_cell, RealConst2d vn_edge, Real t,
+  void compute_tendency(const ShallowWaterState &tend,
+                        const ShallowWaterState &state, Real t,
                         AddMode add_mode = AddMode::replace) const {
     yakl::timer_start("compute_tendency");
 
     yakl::timer_start("compute_auxiliary_variables");
-    compute_auxiliary_variables(h_cell, vn_edge);
+    compute_auxiliary_variables(state.h_cell, state.vn_edge);
     yakl::timer_stop("compute_auxiliary_variables");
 
     yakl::timer_start("h_tendency");
-    compute_h_tendency(h_tend_cell, h_cell, vn_edge, add_mode);
+    compute_h_tendency(tend.h_cell, state.h_cell, state.vn_edge, add_mode);
     yakl::timer_stop("h_tendency");
 
     yakl::timer_start("vn_tendency");
-    compute_vn_tendency(vn_tend_edge, h_cell, vn_edge, add_mode);
+    compute_vn_tendency(tend.vn_edge, state.h_cell, state.vn_edge, add_mode);
     yakl::timer_stop("vn_tendency");
 
-    additional_tendency(h_tend_cell, vn_tend_edge, h_cell, vn_edge, t);
+    additional_tendency(tend.h_cell, tend.vn_edge, state.h_cell, state.vn_edge,
+                        t);
 
     yakl::timer_stop("compute_tendency");
   }
