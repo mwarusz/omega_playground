@@ -4,7 +4,7 @@ namespace omega {
 
 LSRKStepper::LSRKStepper(ShallowWaterModelBase &shallow_water)
     : TimeStepper(shallow_water), rka(nstages), rkb(nstages), rkc(nstages),
-      tend(*shallow_water.mesh) {
+      tend(shallow_water) {
 
   yakl::memset(tend.h_cell, 0);
   yakl::memset(tend.vn_edge, 0);
@@ -26,6 +26,8 @@ void LSRKStepper::do_step(Real t, Real dt,
 
   YAKL_SCOPE(h_tend_cell, this->tend.h_cell);
   YAKL_SCOPE(vn_tend_edge, this->tend.vn_edge);
+  YAKL_SCOPE(tr_tend_cell, this->tend.tr_cell);
+  Int ntracers = shallow_water->ntracers;
 
   for (Int stage = 0; stage < nstages; ++stage) {
     Real rka_stage = rka[stage];
@@ -35,6 +37,11 @@ void LSRKStepper::do_step(Real t, Real dt,
     parallel_for(
         "lsrk1_v", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
         YAKL_LAMBDA(Int iedge, Int k) { vn_tend_edge(iedge, k) *= rka_stage; });
+    parallel_for(
+        "lsrk1_tr", SimpleBounds<3>(ntracers, mesh->ncells, mesh->nlayers),
+        YAKL_LAMBDA(Int l, Int icell, Int k) {
+          tr_tend_cell(l, icell, k) *= rka_stage;
+        });
 
     Real stagetime = t + rkc[stage] * dt;
     shallow_water->compute_tendency(tend, state, stagetime, AddMode::increment);
@@ -49,6 +56,12 @@ void LSRKStepper::do_step(Real t, Real dt,
         "lsrk2_v", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
         YAKL_LAMBDA(Int iedge, Int k) {
           state.vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
+        });
+    parallel_for(
+        "lsrk2_tr", SimpleBounds<3>(ntracers, mesh->nedges, mesh->nlayers),
+        YAKL_LAMBDA(Int l, Int icell, Int k) {
+          state.tr_cell(l, icell, k) +=
+              dt * rkb_stage * tr_tend_cell(l, icell, k);
         });
   }
 }

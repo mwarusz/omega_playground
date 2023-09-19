@@ -7,20 +7,12 @@ namespace omega {
 
 enum class AddMode { replace, increment };
 
-struct ShallowWaterState {
-  Real2d h_cell;
-  Real2d vn_edge;
-  Real3d tr_cell;
-  Int ntracers;
-
-  ShallowWaterState(const PlanarHexagonalMesh &mesh, Int ntracers = 0);
-};
-
 struct ShallowWaterParams {
   Real f0;
   Real grav = 9.81;
   Real drag_coeff = 0;
   Real visc_del2 = 0;
+  Int ntracers = 0;
   bool disable_h_tendency = false;
   bool disable_vn_tendency = false;
 };
@@ -29,11 +21,24 @@ struct LinearShallowWaterParams : ShallowWaterParams {
   Real h0;
 };
 
+// fwd
+struct ShallowWaterModelBase;
+
+struct ShallowWaterState {
+  Real2d h_cell;
+  Real2d vn_edge;
+  Real3d tr_cell;
+
+  ShallowWaterState(const PlanarHexagonalMesh &mesh, Int ntracers);
+  ShallowWaterState(const ShallowWaterModelBase &sw);
+};
+
 struct ShallowWaterModelBase {
   PlanarHexagonalMesh *mesh;
   Real grav;
   bool disable_h_tendency;
   bool disable_vn_tendency;
+  Int ntracers;
   Real1d f_vertex;
   Real1d f_edge;
 
@@ -92,7 +97,6 @@ struct ShallowWaterModelBase {
   }
 
   ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
-                        const ShallowWaterState &state,
                         const ShallowWaterParams &params);
 };
 
@@ -131,7 +135,7 @@ struct ShallowWaterModel : ShallowWaterModelBase {
                            AddMode add_mode) const override;
   Real energy_integral(RealConst2d h, RealConst2d v) const override;
 
-  ShallowWaterModel(PlanarHexagonalMesh &mesh, const ShallowWaterState &state,
+  ShallowWaterModel(PlanarHexagonalMesh &mesh,
                     const ShallowWaterParams &params);
 };
 
@@ -148,7 +152,6 @@ struct LinearShallowWaterModel : ShallowWaterModelBase {
   Real energy_integral(RealConst2d h_cell, RealConst2d vn_edge) const override;
 
   LinearShallowWaterModel(PlanarHexagonalMesh &mesh,
-                          const ShallowWaterState &state,
                           const LinearShallowWaterParams &params);
 };
 } // namespace omega

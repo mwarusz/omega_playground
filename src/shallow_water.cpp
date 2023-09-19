@@ -2,22 +2,15 @@
 
 namespace omega {
 
-ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
-                                     Int ntracers)
-    : h_cell("h_cell", mesh.ncells, mesh.nlayers),
-      vn_edge("vn_edge", mesh.nedges, mesh.nlayers),
-      tr_cell("tr_cell", ntracers, mesh.nedges, mesh.nlayers),
-      ntracers(ntracers) {}
-
 // Base
 
 ShallowWaterModelBase::ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
-                                             const ShallowWaterState &state,
                                              const ShallowWaterParams &params)
     : mesh(&mesh), grav(params.grav),
       disable_h_tendency(params.disable_h_tendency),
       disable_vn_tendency(params.disable_vn_tendency),
-      f_vertex("f_vertex", mesh.nvertices), f_edge("f_edge", mesh.nedges) {
+      ntracers(params.ntracers), f_vertex("f_vertex", mesh.nvertices),
+      f_edge("f_edge", mesh.nedges) {
   yakl::memset(f_vertex, params.f0);
   yakl::memset(f_edge, params.f0);
 }
@@ -65,12 +58,22 @@ Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
   return yakl::intrinsics::sum(column_circulation);
 }
 
+// State
+
+ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
+                                     Int ntracers)
+    : h_cell("h_cell", mesh.ncells, mesh.nlayers),
+      vn_edge("vn_edge", mesh.nedges, mesh.nlayers),
+      tr_cell("tr_cell", ntracers, mesh.nedges, mesh.nlayers) {}
+
+ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
+    : ShallowWaterState(*sw.mesh, sw.ntracers) {}
+
 // Nonlinear
 
 ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
-                                     const ShallowWaterState &state,
                                      const ShallowWaterParams &params)
-    : ShallowWaterModelBase(mesh, state, params), drag_coeff(params.drag_coeff),
+    : ShallowWaterModelBase(mesh, params), drag_coeff(params.drag_coeff),
       visc_del2(params.visc_del2),
       h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
       h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
@@ -78,7 +81,7 @@ ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
       rcirc_vertex("rcirc_vertex", mesh.nvertices, mesh.nlayers),
       rvort_vertex("rvort_vertex", mesh.nvertices, mesh.nlayers),
       rvort_cell("rvort_cell", mesh.ncells, mesh.nlayers),
-      norm_tr_cell("norm_tr_cell", state.ntracers, mesh.ncells, mesh.nlayers),
+      norm_tr_cell("norm_tr_cell", params.ntracers, mesh.ncells, mesh.nlayers),
       ke_cell("ke_cell", mesh.ncells, mesh.nlayers),
       div_cell("div_cell", mesh.ncells, mesh.nlayers),
       vt_edge("vt_edge", mesh.nedges, mesh.nlayers),
@@ -145,7 +148,7 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
   YAKL_SCOPE(ke_cell, this->ke_cell);
   YAKL_SCOPE(div_cell, this->div_cell);
   YAKL_SCOPE(norm_tr_cell, this->norm_tr_cell);
-  Int ntracers = tr_cell.dimension[0];
+  YAKL_SCOPE(ntarcers, this->ntracers);
 
   parallel_for(
       "compute_auxiliarys_cell", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
@@ -355,9 +358,9 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
 
   YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
   YAKL_SCOPE(norm_tr_cell, this->norm_tr_cell);
-  Int ntracers = tr_cell.dimension[0];
+  YAKL_SCOPE(ntracers, this->ntracers);
   parallel_for(
-      "compute_htend", SimpleBounds<3>(ntracers, mesh->ncells, mesh->nlayers),
+      "compute_tr_tend", SimpleBounds<3>(ntracers, mesh->ncells, mesh->nlayers),
       YAKL_LAMBDA(Int l, Int icell, Int k) {
         Real accum = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -417,9 +420,8 @@ Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
 // Linear
 
 LinearShallowWaterModel::LinearShallowWaterModel(
-    PlanarHexagonalMesh &mesh, const ShallowWaterState &state,
-    const LinearShallowWaterParams &params)
-    : ShallowWaterModelBase(mesh, state, params), h0(params.h0) {}
+    PlanarHexagonalMesh &mesh, const LinearShallowWaterParams &params)
+    : ShallowWaterModelBase(mesh, params), h0(params.h0) {}
 
 void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
                                                  RealConst2d h_cell,

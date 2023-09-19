@@ -48,9 +48,9 @@ Real run(Int nx) {
   params.f0 = inertia_gravity_wave.f0;
   params.grav = inertia_gravity_wave.grav;
 
-  ShallowWaterState state(mesh);
+  LinearShallowWaterModel shallow_water(mesh, params);
 
-  LinearShallowWaterModel shallow_water(mesh, state, params);
+  ShallowWaterState state(shallow_water);
 
   RK4Stepper stepper(shallow_water);
 

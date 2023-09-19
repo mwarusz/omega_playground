@@ -65,9 +65,9 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
   ManufacturedSolution manufactured_solution;
 
   ManufacturedShallowWaterModel(
-      PlanarHexagonalMesh &mesh, const ShallowWaterState &state,
+      PlanarHexagonalMesh &mesh,
       const ManufacturedSolution &manufactured_solution)
-      : ShallowWaterModel(mesh, state,
+      : ShallowWaterModel(mesh,
                           ShallowWaterParams{manufactured_solution.f0,
                                              manufactured_solution.grav, 0}),
         manufactured_solution(manufactured_solution) {}
@@ -119,10 +119,9 @@ Real run(Int n) {
 
   PlanarHexagonalMesh mesh(n, n, manufactured_solution.lx / n);
 
-  ShallowWaterState state(mesh);
+  ManufacturedShallowWaterModel shallow_water(mesh, manufactured_solution);
 
-  ManufacturedShallowWaterModel shallow_water(mesh, state,
-                                              manufactured_solution);
+  ShallowWaterState state(shallow_water);
 
   RK4Stepper stepper(shallow_water);
 
