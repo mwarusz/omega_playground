@@ -114,7 +114,7 @@ ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
 ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
                                      const ShallowWaterParams &params)
     : ShallowWaterModelBase(mesh, params), m_drag_coeff(params.m_drag_coeff),
-      m_visc_del2(params.m_visc_del2),
+      m_visc_del2(params.m_visc_del2), m_eddy_diff2(params.m_eddy_diff2),
       m_ke_cell("ke_cell", mesh.m_ncells, mesh.m_nlayers),
       m_div_cell("div_cell", mesh.m_ncells, mesh.m_nlayers),
       // m_rvort_cell("rvort_cell", mesh.m_ncells, mesh.m_nlayers),
@@ -405,18 +405,22 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
   YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
   YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
   YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
 
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
+  YAKL_SCOPE(h_mean_edge, m_h_mean_edge);
   YAKL_SCOPE(norm_tr_cell, m_norm_tr_cell);
   YAKL_SCOPE(ntracers, m_ntracers);
+  YAKL_SCOPE(eddy_diff2, m_eddy_diff2);
   parallel_for(
       "compute_tr_tend",
       SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int l, Int icell, Int k) {
-        Real accum = -0;
+        Real tr_tend = -0;
+
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
           Int jedge = edges_on_cell(icell, j);
 
@@ -426,16 +430,27 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           Real norm_tr_edge =
               (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) / 2;
 
-          accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                   h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
+          // advection
+          Real tr_flux =
+              -h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
+
+          if (eddy_diff2 > 0) {
+            Real grad_tr_edge =
+                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) /
+                dc_edge(jedge);
+            // diffusion
+            tr_flux += eddy_diff2 * h_mean_edge(jedge, k) * grad_tr_edge;
+          }
+
+          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
         }
 
         if (add_mode == AddMode::increment) {
-          tr_tend_cell(l, icell, k) += -accum / area_cell(icell);
+          tr_tend_cell(l, icell, k) += tr_tend / area_cell(icell);
         }
 
         if (add_mode == AddMode::replace) {
-          tr_tend_cell(l, icell, k) = -accum / area_cell(icell);
+          tr_tend_cell(l, icell, k) = tr_tend / area_cell(icell);
         }
       });
 }
