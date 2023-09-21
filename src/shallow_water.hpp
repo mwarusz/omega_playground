@@ -13,6 +13,7 @@ struct ShallowWaterParams {
   Real m_drag_coeff = 0;
   Real m_visc_del2 = 0;
   Real m_eddy_diff2 = 0;
+  Real m_eddy_diff4 = 0;
   Int m_ntracers = 0;
   bool m_disable_h_tendency = false;
   bool m_disable_vn_tendency = false;
@@ -76,6 +77,7 @@ struct ShallowWaterModel : ShallowWaterModelBase {
   Real m_drag_coeff;
   Real m_visc_del2;
   Real m_eddy_diff2;
+  Real m_eddy_diff4;
 
   Real2d m_ke_cell;
   Real2d m_div_cell;
