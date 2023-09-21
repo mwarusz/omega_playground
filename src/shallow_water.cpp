@@ -380,16 +380,20 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                                     vn_edge(iedge, k) / h_drag_edge(iedge, k)
                               : 0;
 
-        Int ivertex0 = vertices_on_edge(iedge, 0);
-        Int ivertex1 = vertices_on_edge(iedge, 1);
-        // TODO: add mesh scaling
-        Real visc2 =
-            visc_del2 *
-            ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
-             (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) /
-                 dv_edge(iedge));
+        vn_tend = qt - grad_B + drag_force;
 
-        vn_tend = qt - grad_B + drag_force + visc2;
+        if (visc_del2 > 0) {
+          // TODO: add mesh scaling
+          Int ivertex0 = vertices_on_edge(iedge, 0);
+          Int ivertex1 = vertices_on_edge(iedge, 1);
+          Real visc2 =
+              visc_del2 *
+              ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
+               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) /
+                   dv_edge(iedge));
+          vn_tend += visc2;
+        }
+
         if (add_mode == AddMode::increment) {
           vn_tend_edge(iedge, k) += vn_tend;
         }
