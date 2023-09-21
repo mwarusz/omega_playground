@@ -15,6 +15,45 @@ ShallowWaterModelBase::ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
   yakl::memset(m_f_edge, params.m_f0);
 }
 
+void ShallowWaterModelBase::compute_auxiliary_variables(
+    RealConst2d h_cell, RealConst2d vn_edge, RealConst3d tr_cell) const {}
+
+void ShallowWaterModelBase::compute_tendency(const ShallowWaterState &tend,
+                                             const ShallowWaterState &state,
+                                             Real t, AddMode add_mode) const {
+  yakl::timer_start("compute_tendency");
+
+  yakl::timer_start("compute_auxiliary_variables");
+  compute_auxiliary_variables(state.m_h_cell, state.m_vn_edge, state.m_tr_cell);
+  yakl::timer_stop("compute_auxiliary_variables");
+
+  yakl::timer_start("h_tendency");
+  if (!m_disable_h_tendency) {
+    compute_h_tendency(tend.m_h_cell, state.m_h_cell, state.m_vn_edge,
+                       add_mode);
+  }
+  yakl::timer_stop("h_tendency");
+
+  yakl::timer_start("vn_tendency");
+  if (!m_disable_vn_tendency) {
+    compute_vn_tendency(tend.m_vn_edge, state.m_h_cell, state.m_vn_edge,
+                        add_mode);
+  }
+  yakl::timer_stop("vn_tendency");
+
+  yakl::timer_start("tr_tendency");
+  compute_tr_tendency(tend.m_tr_cell, state.m_tr_cell, state.m_vn_edge,
+                      add_mode);
+  yakl::timer_stop("tr_tendency");
+
+  yakl::timer_start("additional_tendency");
+  additional_tendency(tend.m_h_cell, tend.m_vn_edge, state.m_h_cell,
+                      state.m_vn_edge, t);
+  yakl::timer_stop("additional_tendency");
+
+  yakl::timer_stop("compute_tendency");
+}
+
 Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
   Real1d column_mass("column_mass", m_mesh->m_ncells);
 
