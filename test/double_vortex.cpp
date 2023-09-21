@@ -5,62 +5,62 @@
 using namespace omega;
 
 struct DoubleVortex {
-  Real g = 9.80616;
-  Real lx = 5000000;
-  Real ly = 5000000;
-  Real coriolis = 0.00006147;
-  Real h0 = 750;
-  Real ox = 0.1;
-  Real oy = 0.1;
-  Real sigmax = 3. / 40. * lx;
-  Real sigmay = 3. / 40. * ly;
-  Real dh = 75;
-  Real xc1 = (0.5 - ox) * lx;
-  Real yc1 = (0.5 - oy) * ly;
-  Real xc2 = (0.5 + ox) * lx;
-  Real yc2 = (0.5 + oy) * ly;
+  Real m_g = 9.80616;
+  Real m_lx = 5000000;
+  Real m_ly = 5000000;
+  Real m_coriolis = 0.00006147;
+  Real m_h0 = 750;
+  Real m_ox = 0.1;
+  Real m_oy = 0.1;
+  Real m_sigmax = 3. / 40. * m_lx;
+  Real m_sigmay = 3. / 40. * m_ly;
+  Real m_dh = 75;
+  Real m_xc1 = (0.5 - m_ox) * m_lx;
+  Real m_yc1 = (0.5 - m_oy) * m_ly;
+  Real m_xc2 = (0.5 + m_ox) * m_lx;
+  Real m_yc2 = (0.5 + m_oy) * m_ly;
 
   YAKL_INLINE Real h(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
-    Real xprime1 = lx / (pi * sigmax) * sin(pi / lx * (x - xc1));
-    Real yprime1 = ly / (pi * sigmay) * sin(pi / ly * (y - yc1));
-    Real xprime2 = lx / (pi * sigmax) * sin(pi / lx * (x - xc2));
-    Real yprime2 = ly / (pi * sigmay) * sin(pi / ly * (y - yc2));
+    Real xprime1 = m_lx / (pi * m_sigmax) * sin(pi / m_lx * (x - m_xc1));
+    Real yprime1 = m_ly / (pi * m_sigmay) * sin(pi / m_ly * (y - m_yc1));
+    Real xprime2 = m_lx / (pi * m_sigmax) * sin(pi / m_lx * (x - m_xc2));
+    Real yprime2 = m_ly / (pi * m_sigmay) * sin(pi / m_ly * (y - m_yc2));
     Real xprimeprime1 =
-        lx / (2.0 * pi * sigmax) * sin(2.0 * pi / lx * (x - xc1));
+        m_lx / (2.0 * pi * m_sigmax) * sin(2.0 * pi / m_lx * (x - m_xc1));
     Real yprimeprime1 =
-        ly / (2.0 * pi * sigmay) * sin(2.0 * pi / ly * (y - yc1));
+        m_ly / (2.0 * pi * m_sigmay) * sin(2.0 * pi / m_ly * (y - m_yc1));
     Real xprimeprime2 =
-        lx / (2.0 * pi * sigmax) * sin(2.0 * pi / lx * (x - xc2));
+        m_lx / (2.0 * pi * m_sigmax) * sin(2.0 * pi / m_lx * (x - m_xc2));
     Real yprimeprime2 =
-        ly / (2.0 * pi * sigmay) * sin(2.0 * pi / ly * (y - yc2));
+        m_ly / (2.0 * pi * m_sigmay) * sin(2.0 * pi / m_ly * (y - m_yc2));
 
-    return h0 - dh * (exp(-0.5 * (xprime1 * xprime1 + yprime1 * yprime1)) +
-                      exp(-0.5 * (xprime2 * xprime2 + yprime2 * yprime2)) -
-                      4. * pi * sigmax * sigmay / lx / ly);
+    return m_h0 - m_dh * (exp(-0.5 * (xprime1 * xprime1 + yprime1 * yprime1)) +
+                          exp(-0.5 * (xprime2 * xprime2 + yprime2 * yprime2)) -
+                          4. * pi * m_sigmax * m_sigmay / m_lx / m_ly);
   }
 
   YAKL_INLINE Real vx(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
-    Real xprime1 = lx / (pi * sigmax) * sin(pi / lx * (x - xc1));
-    Real yprime1 = ly / (pi * sigmay) * sin(pi / ly * (y - yc1));
-    Real xprime2 = lx / (pi * sigmax) * sin(pi / lx * (x - xc2));
-    Real yprime2 = ly / (pi * sigmay) * sin(pi / ly * (y - yc2));
+    Real xprime1 = m_lx / (pi * m_sigmax) * sin(pi / m_lx * (x - m_xc1));
+    Real yprime1 = m_ly / (pi * m_sigmay) * sin(pi / m_ly * (y - m_yc1));
+    Real xprime2 = m_lx / (pi * m_sigmax) * sin(pi / m_lx * (x - m_xc2));
+    Real yprime2 = m_ly / (pi * m_sigmay) * sin(pi / m_ly * (y - m_yc2));
     Real xprimeprime1 =
-        lx / (2.0 * pi * sigmax) * sin(2.0 * pi / lx * (x - xc1));
+        m_lx / (2.0 * pi * m_sigmax) * sin(2.0 * pi / m_lx * (x - m_xc1));
     Real yprimeprime1 =
-        ly / (2.0 * pi * sigmay) * sin(2.0 * pi / ly * (y - yc1));
+        m_ly / (2.0 * pi * m_sigmay) * sin(2.0 * pi / m_ly * (y - m_yc1));
     Real xprimeprime2 =
-        lx / (2.0 * pi * sigmax) * sin(2.0 * pi / lx * (x - xc2));
+        m_lx / (2.0 * pi * m_sigmax) * sin(2.0 * pi / m_lx * (x - m_xc2));
     Real yprimeprime2 =
-        ly / (2.0 * pi * sigmay) * sin(2.0 * pi / ly * (y - yc2));
+        m_ly / (2.0 * pi * m_sigmay) * sin(2.0 * pi / m_ly * (y - m_yc2));
 
     Real vx =
-        -g * dh / coriolis / sigmay *
+        -m_g * m_dh / m_coriolis / m_sigmay *
         (yprimeprime1 * exp(-0.5 * (xprime1 * xprime1 + yprime1 * yprime1)) +
          yprimeprime2 * exp(-0.5 * (xprime2 * xprime2 + yprime2 * yprime2)));
     return vx;
@@ -70,21 +70,21 @@ struct DoubleVortex {
     using std::exp;
     using std::sin;
 
-    Real xprime1 = lx / (pi * sigmax) * sin(pi / lx * (x - xc1));
-    Real yprime1 = ly / (pi * sigmay) * sin(pi / ly * (y - yc1));
-    Real xprime2 = lx / (pi * sigmax) * sin(pi / lx * (x - xc2));
-    Real yprime2 = ly / (pi * sigmay) * sin(pi / ly * (y - yc2));
+    Real xprime1 = m_lx / (pi * m_sigmax) * sin(pi / m_lx * (x - m_xc1));
+    Real yprime1 = m_ly / (pi * m_sigmay) * sin(pi / m_ly * (y - m_yc1));
+    Real xprime2 = m_lx / (pi * m_sigmax) * sin(pi / m_lx * (x - m_xc2));
+    Real yprime2 = m_ly / (pi * m_sigmay) * sin(pi / m_ly * (y - m_yc2));
     Real xprimeprime1 =
-        lx / (2.0 * pi * sigmax) * sin(2.0 * pi / lx * (x - xc1));
+        m_lx / (2.0 * pi * m_sigmax) * sin(2.0 * pi / m_lx * (x - m_xc1));
     Real yprimeprime1 =
-        ly / (2.0 * pi * sigmay) * sin(2.0 * pi / ly * (y - yc1));
+        m_ly / (2.0 * pi * m_sigmay) * sin(2.0 * pi / m_ly * (y - m_yc1));
     Real xprimeprime2 =
-        lx / (2.0 * pi * sigmax) * sin(2.0 * pi / lx * (x - xc2));
+        m_lx / (2.0 * pi * m_sigmax) * sin(2.0 * pi / m_lx * (x - m_xc2));
     Real yprimeprime2 =
-        ly / (2.0 * pi * sigmay) * sin(2.0 * pi / ly * (y - yc2));
+        m_ly / (2.0 * pi * m_sigmay) * sin(2.0 * pi / m_ly * (y - m_yc2));
 
     Real vy =
-        g * dh / coriolis / sigmax *
+        m_g * m_dh / m_coriolis / m_sigmax *
         (xprimeprime1 * exp(-0.5 * (xprime1 * xprime1 + yprime1 * yprime1)) +
          xprimeprime2 * exp(-0.5 * (xprime2 * xprime2 + yprime2 * yprime2)));
     return vy;
@@ -94,13 +94,13 @@ struct DoubleVortex {
 void run(Int nx, Real cfl) {
   DoubleVortex double_vortex;
 
-  Real dc = double_vortex.lx / nx;
-  Int ny = std::ceil(double_vortex.ly / (dc * std::sqrt(3) / 2));
+  Real dc = double_vortex.m_lx / nx;
+  Int ny = std::ceil(double_vortex.m_ly / (dc * std::sqrt(3) / 2));
   PlanarHexagonalMesh mesh(nx, ny, dc);
 
   ShallowWaterParams params;
-  params.f0 = double_vortex.coriolis;
-  params.grav = double_vortex.g;
+  params.m_f0 = double_vortex.m_coriolis;
+  params.m_grav = double_vortex.m_g;
 
   ShallowWaterModel shallow_water(mesh, params);
 
@@ -109,27 +109,28 @@ void run(Int nx, Real cfl) {
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 200 * 1000;
-  Real dt = cfl * mesh.dc / std::sqrt(shallow_water.grav * double_vortex.h0);
+  Real dt =
+      cfl * mesh.m_dc / std::sqrt(shallow_water.m_grav * double_vortex.m_h0);
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  auto &h_cell = state.h_cell;
+  auto &h_cell = state.m_h_cell;
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
+      "init_h", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real x = mesh.x_cell(icell);
-        Real y = mesh.y_cell(icell);
+        Real x = mesh.m_x_cell(icell);
+        Real y = mesh.m_y_cell(icell);
         h_cell(icell, k) = double_vortex.h(x, y);
       });
 
-  auto &vn_edge = state.vn_edge;
+  auto &vn_edge = state.m_vn_edge;
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
+      "init_vn", SimpleBounds<2>(mesh.m_nedges, mesh.m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
-        Real nx = std::cos(mesh.angle_edge(iedge));
-        Real ny = std::sin(mesh.angle_edge(iedge));
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
+        Real nx = std::cos(mesh.m_angle_edge(iedge));
+        Real ny = std::sin(mesh.m_angle_edge(iedge));
         Real vx = double_vortex.vx(x, y);
         Real vy = double_vortex.vy(x, y);
         vn_edge(iedge, k) = nx * vx + ny * vy;

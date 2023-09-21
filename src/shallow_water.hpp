@@ -8,39 +8,39 @@ namespace omega {
 enum class AddMode { replace, increment };
 
 struct ShallowWaterParams {
-  Real f0;
-  Real grav = 9.81;
-  Real drag_coeff = 0;
-  Real visc_del2 = 0;
-  Int ntracers = 0;
-  bool disable_h_tendency = false;
-  bool disable_vn_tendency = false;
+  Real m_f0;
+  Real m_grav = 9.81;
+  Real m_drag_coeff = 0;
+  Real m_visc_del2 = 0;
+  Int m_ntracers = 0;
+  bool m_disable_h_tendency = false;
+  bool m_disable_vn_tendency = false;
 };
 
 struct LinearShallowWaterParams : ShallowWaterParams {
-  Real h0;
+  Real m_h0;
 };
 
 // fwd
 struct ShallowWaterModelBase;
 
 struct ShallowWaterState {
-  Real2d h_cell;
-  Real2d vn_edge;
-  Real3d tr_cell;
+  Real2d m_h_cell;
+  Real2d m_vn_edge;
+  Real3d m_tr_cell;
 
   ShallowWaterState(const PlanarHexagonalMesh &mesh, Int ntracers);
   ShallowWaterState(const ShallowWaterModelBase &sw);
 };
 
 struct ShallowWaterModelBase {
-  PlanarHexagonalMesh *mesh;
-  Real grav;
-  bool disable_h_tendency;
-  bool disable_vn_tendency;
-  Int ntracers;
-  Real1d f_vertex;
-  Real1d f_edge;
+  PlanarHexagonalMesh *m_mesh;
+  Real m_grav;
+  bool m_disable_h_tendency;
+  bool m_disable_vn_tendency;
+  Int m_ntracers;
+  Real1d m_f_vertex;
+  Real1d m_f_edge;
 
   virtual void compute_auxiliary_variables(RealConst2d h_cell,
                                            RealConst2d vn_edge,
@@ -69,28 +69,32 @@ struct ShallowWaterModelBase {
     yakl::timer_start("compute_tendency");
 
     yakl::timer_start("compute_auxiliary_variables");
-    compute_auxiliary_variables(state.h_cell, state.vn_edge, state.tr_cell);
+    compute_auxiliary_variables(state.m_h_cell, state.m_vn_edge,
+                                state.m_tr_cell);
     yakl::timer_stop("compute_auxiliary_variables");
 
     yakl::timer_start("h_tendency");
-    if (!disable_h_tendency) {
-      compute_h_tendency(tend.h_cell, state.h_cell, state.vn_edge, add_mode);
+    if (!m_disable_h_tendency) {
+      compute_h_tendency(tend.m_h_cell, state.m_h_cell, state.m_vn_edge,
+                         add_mode);
     }
     yakl::timer_stop("h_tendency");
 
     yakl::timer_start("vn_tendency");
-    if (!disable_vn_tendency) {
-      compute_vn_tendency(tend.vn_edge, state.h_cell, state.vn_edge, add_mode);
+    if (!m_disable_vn_tendency) {
+      compute_vn_tendency(tend.m_vn_edge, state.m_h_cell, state.m_vn_edge,
+                          add_mode);
     }
     yakl::timer_stop("vn_tendency");
 
     yakl::timer_start("tr_tendency");
-    compute_tr_tendency(tend.tr_cell, state.tr_cell, state.vn_edge, add_mode);
+    compute_tr_tendency(tend.m_tr_cell, state.m_tr_cell, state.m_vn_edge,
+                        add_mode);
     yakl::timer_stop("tr_tendency");
 
     yakl::timer_start("additional_tendency");
-    additional_tendency(tend.h_cell, tend.vn_edge, state.h_cell, state.vn_edge,
-                        t);
+    additional_tendency(tend.m_h_cell, tend.m_vn_edge, state.m_h_cell,
+                        state.m_vn_edge, t);
     yakl::timer_stop("additional_tendency");
 
     yakl::timer_stop("compute_tendency");
@@ -101,26 +105,26 @@ struct ShallowWaterModelBase {
 };
 
 struct ShallowWaterModel : ShallowWaterModelBase {
-  Real drag_coeff;
-  Real visc_del2;
+  Real m_drag_coeff;
+  Real m_visc_del2;
 
-  Real2d rvort_cell;
-  Real2d ke_cell;
-  Real2d div_cell;
-  Real2d norm_rvort_cell;
-  Real3d norm_tr_cell;
+  Real2d m_rvort_cell;
+  Real2d m_ke_cell;
+  Real2d m_div_cell;
+  Real2d m_norm_rvort_cell;
+  Real3d m_norm_tr_cell;
 
-  Real2d h_flux_edge;
-  Real2d h_mean_edge;
-  Real2d h_drag_edge;
-  Real2d vt_edge;
-  Real2d norm_rvort_edge;
-  Real2d norm_f_edge;
+  Real2d m_h_flux_edge;
+  Real2d m_h_mean_edge;
+  Real2d m_h_drag_edge;
+  Real2d m_vt_edge;
+  Real2d m_norm_rvort_edge;
+  Real2d m_norm_f_edge;
 
-  Real2d rcirc_vertex;
-  Real2d rvort_vertex;
-  Real2d norm_rvort_vertex;
-  Real2d norm_f_vertex;
+  Real2d m_rcirc_vertex;
+  Real2d m_rvort_vertex;
+  Real2d m_norm_rvort_vertex;
+  Real2d m_norm_f_vertex;
 
   void compute_auxiliary_variables(RealConst2d h_cell, RealConst2d vn_edge,
                                    RealConst3d tr_cell) const override;
@@ -140,7 +144,7 @@ struct ShallowWaterModel : ShallowWaterModelBase {
 };
 
 struct LinearShallowWaterModel : ShallowWaterModelBase {
-  Real h0;
+  Real m_h0;
   void compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
                           RealConst2d vn_edge, AddMode add_mode) const override;
   void compute_vn_tendency(Real2d vn_tend_edge, RealConst2d h_cell,

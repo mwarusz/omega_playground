@@ -6,23 +6,23 @@ namespace omega {
 
 ShallowWaterModelBase::ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
                                              const ShallowWaterParams &params)
-    : mesh(&mesh), grav(params.grav),
-      disable_h_tendency(params.disable_h_tendency),
-      disable_vn_tendency(params.disable_vn_tendency),
-      ntracers(params.ntracers), f_vertex("f_vertex", mesh.nvertices),
-      f_edge("f_edge", mesh.nedges) {
-  yakl::memset(f_vertex, params.f0);
-  yakl::memset(f_edge, params.f0);
+    : m_mesh(&mesh), m_grav(params.m_grav),
+      m_disable_h_tendency(params.m_disable_h_tendency),
+      m_disable_vn_tendency(params.m_disable_vn_tendency),
+      m_ntracers(params.m_ntracers), m_f_vertex("f_vertex", mesh.m_nvertices),
+      m_f_edge("f_edge", mesh.m_nedges) {
+  yakl::memset(m_f_vertex, params.m_f0);
+  yakl::memset(m_f_edge, params.m_f0);
 }
 
 Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
-  Real1d column_mass("column_mass", mesh->ncells);
+  Real1d column_mass("column_mass", m_mesh->m_ncells);
 
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
 
   parallel_for(
-      "compute_column_mass", mesh->ncells, YAKL_LAMBDA(Int icell) {
+      "compute_column_mass", m_mesh->m_ncells, YAKL_LAMBDA(Int icell) {
         column_mass(icell) = 0;
         for (Int k = 0; k < max_level_cell(icell); ++k) {
           column_mass(icell) += area_cell(icell) * h_cell(icell, k);
@@ -32,17 +32,18 @@ Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
 }
 
 Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
-  Real1d column_circulation("column_circulation", mesh->nvertices);
+  Real1d column_circulation("column_circulation", m_mesh->m_nvertices);
 
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
-  YAKL_SCOPE(edge_sign_on_vertex, mesh->edge_sign_on_vertex);
-  YAKL_SCOPE(area_triangle, mesh->area_triangle);
-  YAKL_SCOPE(f_vertex, this->f_vertex);
-  YAKL_SCOPE(max_level_vertex_bot, mesh->max_level_vertex_bot);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
+  YAKL_SCOPE(edges_on_vertex, m_mesh->m_edges_on_vertex);
+  YAKL_SCOPE(edge_sign_on_vertex, m_mesh->m_edge_sign_on_vertex);
+  YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
+  YAKL_SCOPE(f_vertex, m_f_vertex);
+  YAKL_SCOPE(max_level_vertex_bot, m_mesh->m_max_level_vertex_bot);
 
   parallel_for(
-      "compute_column_circulation", mesh->nvertices, YAKL_LAMBDA(Int ivertex) {
+      "compute_column_circulation", m_mesh->m_nvertices,
+      YAKL_LAMBDA(Int ivertex) {
         column_circulation(ivertex) = 0;
         for (Int k = 0; k < max_level_vertex_bot(ivertex); ++k) {
           Real cir_i = -0;
@@ -62,46 +63,48 @@ Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
 
 ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
                                      Int ntracers)
-    : h_cell("h_cell", mesh.ncells, mesh.nlayers),
-      vn_edge("vn_edge", mesh.nedges, mesh.nlayers),
-      tr_cell("tr_cell", ntracers, mesh.nedges, mesh.nlayers) {}
+    : m_h_cell("h_cell", mesh.m_ncells, mesh.m_nlayers),
+      m_vn_edge("vn_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_tr_cell("tr_cell", ntracers, mesh.m_nedges, mesh.m_nlayers) {}
 
 ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
-    : ShallowWaterState(*sw.mesh, sw.ntracers) {}
+    : ShallowWaterState(*sw.m_mesh, sw.m_ntracers) {}
 
 // Nonlinear
 
 ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
                                      const ShallowWaterParams &params)
-    : ShallowWaterModelBase(mesh, params), drag_coeff(params.drag_coeff),
-      visc_del2(params.visc_del2),
-      h_flux_edge("h_flux_edge", mesh.nedges, mesh.nlayers),
-      h_mean_edge("h_mean_edge", mesh.nedges, mesh.nlayers),
-      h_drag_edge("h_drag_edge", mesh.nedges, mesh.nlayers),
-      rcirc_vertex("rcirc_vertex", mesh.nvertices, mesh.nlayers),
-      rvort_vertex("rvort_vertex", mesh.nvertices, mesh.nlayers),
-      rvort_cell("rvort_cell", mesh.ncells, mesh.nlayers),
-      norm_tr_cell("norm_tr_cell", params.ntracers, mesh.ncells, mesh.nlayers),
-      ke_cell("ke_cell", mesh.ncells, mesh.nlayers),
-      div_cell("div_cell", mesh.ncells, mesh.nlayers),
-      vt_edge("vt_edge", mesh.nedges, mesh.nlayers),
-      norm_rvort_vertex("norm_rvort_vertex", mesh.nvertices, mesh.nlayers),
-      norm_f_vertex("norm_f_vertex", mesh.nvertices, mesh.nlayers),
-      norm_rvort_edge("norm_rvort_edge", mesh.nedges, mesh.nlayers),
-      norm_f_edge("norm_f_edge", mesh.nedges, mesh.nlayers),
-      norm_rvort_cell("norm_rvort_cell", mesh.ncells, mesh.nlayers) {}
+    : ShallowWaterModelBase(mesh, params), m_drag_coeff(params.m_drag_coeff),
+      m_visc_del2(params.m_visc_del2),
+      m_h_flux_edge("h_flux_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_h_mean_edge("h_mean_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_h_drag_edge("h_drag_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_rcirc_vertex("rcirc_vertex", mesh.m_nvertices, mesh.m_nlayers),
+      m_rvort_vertex("rvort_vertex", mesh.m_nvertices, mesh.m_nlayers),
+      m_rvort_cell("rvort_cell", mesh.m_ncells, mesh.m_nlayers),
+      m_norm_tr_cell("norm_tr_cell", params.m_ntracers, mesh.m_ncells,
+                     mesh.m_nlayers),
+      m_ke_cell("ke_cell", mesh.m_ncells, mesh.m_nlayers),
+      m_div_cell("div_cell", mesh.m_ncells, mesh.m_nlayers),
+      m_vt_edge("vt_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_norm_rvort_vertex("norm_rvort_vertex", mesh.m_nvertices,
+                          mesh.m_nlayers),
+      m_norm_f_vertex("norm_f_vertex", mesh.m_nvertices, mesh.m_nlayers),
+      m_norm_rvort_edge("norm_rvort_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_norm_f_edge("norm_f_edge", mesh.m_nedges, mesh.m_nlayers),
+      m_norm_rvort_cell("norm_rvort_cell", mesh.m_ncells, mesh.m_nlayers) {}
 
 void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
                                                     RealConst2d vn_edge,
                                                     RealConst3d tr_cell) const {
 
-  YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
-  YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
-  YAKL_SCOPE(h_mean_edge, this->h_mean_edge);
-  YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
-  YAKL_SCOPE(h_drag_edge, this->h_drag_edge);
+  YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
+  YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
+  YAKL_SCOPE(h_mean_edge, m_h_mean_edge);
+  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
+  YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
   parallel_for(
-      "compute_h_edge", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      "compute_h_edge", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real h_mean = -0;
         for (Int j = 0; j < 2; ++j) {
@@ -115,16 +118,16 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
         h_drag_edge(iedge, k) = h_mean;
       });
 
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(edges_on_vertex, mesh->edges_on_vertex);
-  YAKL_SCOPE(edge_sign_on_vertex, mesh->edge_sign_on_vertex);
-  YAKL_SCOPE(area_triangle, mesh->area_triangle);
-  YAKL_SCOPE(max_level_vertex_bot, mesh->max_level_vertex_bot);
-  YAKL_SCOPE(rcirc_vertex, this->rcirc_vertex);
-  YAKL_SCOPE(rvort_vertex, this->rvort_vertex);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
+  YAKL_SCOPE(edges_on_vertex, m_mesh->m_edges_on_vertex);
+  YAKL_SCOPE(edge_sign_on_vertex, m_mesh->m_edge_sign_on_vertex);
+  YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
+  YAKL_SCOPE(max_level_vertex_bot, m_mesh->m_max_level_vertex_bot);
+  YAKL_SCOPE(rcirc_vertex, m_rcirc_vertex);
+  YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
   parallel_for(
       "compute_rcirc_and_rvort_vertex",
-      SimpleBounds<2>(mesh->nvertices, mesh->nlayers),
+      SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int ivertex, Int k) {
         Real rcirc = -0;
         for (Int j = 0; j < 3; ++j) {
@@ -136,22 +139,23 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
         rvort_vertex(ivertex, k) = rcirc / area_triangle(ivertex);
       });
 
-  YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
-  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
-  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(vertices_on_cell, mesh->vertices_on_cell);
-  YAKL_SCOPE(kite_index_on_cell, mesh->kite_index_on_cell);
-  YAKL_SCOPE(kiteareas_on_vertex, mesh->kiteareas_on_vertex);
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(rvort_cell, this->rvort_cell);
-  YAKL_SCOPE(ke_cell, this->ke_cell);
-  YAKL_SCOPE(div_cell, this->div_cell);
-  YAKL_SCOPE(norm_tr_cell, this->norm_tr_cell);
-  YAKL_SCOPE(ntarcers, this->ntracers);
+  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
+  YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(vertices_on_cell, m_mesh->m_vertices_on_cell);
+  YAKL_SCOPE(kite_index_on_cell, m_mesh->m_kite_index_on_cell);
+  YAKL_SCOPE(kiteareas_on_vertex, m_mesh->m_kiteareas_on_vertex);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(rvort_cell, m_rvort_cell);
+  YAKL_SCOPE(ke_cell, m_ke_cell);
+  YAKL_SCOPE(div_cell, m_div_cell);
+  YAKL_SCOPE(norm_tr_cell, m_norm_tr_cell);
+  YAKL_SCOPE(ntracers, m_ntracers);
 
   parallel_for(
-      "compute_auxiliarys_cell", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      "compute_auxiliarys_cell",
+      SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real ke = -0;
         Real rvort = -0;
@@ -180,12 +184,12 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
         }
       });
 
-  YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
-  YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
-  YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
-  YAKL_SCOPE(vt_edge, this->vt_edge);
+  YAKL_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
+  YAKL_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
+  YAKL_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
+  YAKL_SCOPE(vt_edge, m_vt_edge);
   parallel_for(
-      "compute_vt_edge", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      "compute_vt_edge", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real vt = -0;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
@@ -195,14 +199,14 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
         vt_edge(iedge, k) = vt;
       });
 
-  YAKL_SCOPE(f_vertex, this->f_vertex);
-  YAKL_SCOPE(cells_on_vertex, mesh->cells_on_vertex);
-  YAKL_SCOPE(norm_rvort_vertex, this->norm_rvort_vertex);
-  YAKL_SCOPE(norm_f_vertex, this->norm_f_vertex);
+  YAKL_SCOPE(f_vertex, m_f_vertex);
+  YAKL_SCOPE(cells_on_vertex, m_mesh->m_cells_on_vertex);
+  YAKL_SCOPE(norm_rvort_vertex, m_norm_rvort_vertex);
+  YAKL_SCOPE(norm_f_vertex, m_norm_f_vertex);
 
   parallel_for(
       "compute_norm_rvort_and_f_vertex",
-      SimpleBounds<2>(mesh->nvertices, mesh->nlayers),
+      SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int ivertex, Int k) {
         Real h = -0;
         for (Int j = 0; j < 3; ++j) {
@@ -214,13 +218,13 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
         norm_f_vertex(ivertex, k) = f_vertex(ivertex) / h;
       });
 
-  YAKL_SCOPE(max_level_edge_bot, mesh->max_level_edge_bot);
-  YAKL_SCOPE(vertices_on_edge, mesh->vertices_on_edge);
-  YAKL_SCOPE(norm_rvort_edge, this->norm_rvort_edge);
-  YAKL_SCOPE(norm_f_edge, this->norm_f_edge);
+  YAKL_SCOPE(max_level_edge_bot, m_mesh->m_max_level_edge_bot);
+  YAKL_SCOPE(vertices_on_edge, m_mesh->m_vertices_on_edge);
+  YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
+  YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
   parallel_for(
       "compute_norm_rvort_and_f_edge",
-      SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real norm_f = -0;
         Real norm_rvort = -0;
@@ -242,16 +246,16 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
                                            RealConst2d h_cell,
                                            RealConst2d vn_edge,
                                            AddMode add_mode) const {
-  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
-  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(edge_sign_on_cell, mesh->edge_sign_on_cell);
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
+  YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
 
-  YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
+  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
   parallel_for(
-      "compute_htend", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      "compute_htend", SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real accum = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -274,28 +278,28 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                                             RealConst2d h_cell,
                                             RealConst2d vn_edge,
                                             AddMode add_mode) const {
-  YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
-  YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
-  YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
-  YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
-  YAKL_SCOPE(vertices_on_edge, mesh->vertices_on_edge);
+  YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
+  YAKL_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
+  YAKL_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
+  YAKL_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
+  YAKL_SCOPE(vertices_on_edge, m_mesh->m_vertices_on_edge);
 
-  YAKL_SCOPE(grav, this->grav);
-  YAKL_SCOPE(norm_rvort_edge, this->norm_rvort_edge);
-  YAKL_SCOPE(norm_f_edge, this->norm_f_edge);
-  YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
-  YAKL_SCOPE(h_drag_edge, this->h_drag_edge);
-  YAKL_SCOPE(ke_cell, this->ke_cell);
-  YAKL_SCOPE(div_cell, this->div_cell);
-  YAKL_SCOPE(rvort_vertex, this->rvort_vertex);
-  YAKL_SCOPE(drag_coeff, this->drag_coeff);
-  YAKL_SCOPE(visc_del2, this->visc_del2);
+  YAKL_SCOPE(grav, m_grav);
+  YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
+  YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
+  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
+  YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
+  YAKL_SCOPE(ke_cell, m_ke_cell);
+  YAKL_SCOPE(div_cell, m_div_cell);
+  YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
+  YAKL_SCOPE(drag_coeff, m_drag_coeff);
+  YAKL_SCOPE(visc_del2, m_visc_del2);
 
   parallel_for(
-      "compute_vtend", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real vn_tend = -0;
 
@@ -349,18 +353,19 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                                             RealConst3d tr_cell,
                                             RealConst2d vn_edge,
                                             AddMode add_mode) const {
-  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
-  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(edge_sign_on_cell, mesh->edge_sign_on_cell);
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
+  YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
 
-  YAKL_SCOPE(h_flux_edge, this->h_flux_edge);
-  YAKL_SCOPE(norm_tr_cell, this->norm_tr_cell);
-  YAKL_SCOPE(ntracers, this->ntracers);
+  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
+  YAKL_SCOPE(norm_tr_cell, m_norm_tr_cell);
+  YAKL_SCOPE(ntracers, m_ntracers);
   parallel_for(
-      "compute_tr_tend", SimpleBounds<3>(ntracers, mesh->ncells, mesh->nlayers),
+      "compute_tr_tend",
+      SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int l, Int icell, Int k) {
         Real accum = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -388,18 +393,18 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
 
 Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
                                         RealConst2d vn_edge) const {
-  Real1d column_energy("column_energy", mesh->ncells);
+  Real1d column_energy("column_energy", m_mesh->m_ncells);
 
-  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
-  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
-  YAKL_SCOPE(grav, this->grav);
+  YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
+  YAKL_SCOPE(grav, m_grav);
 
   parallel_for(
-      "compute_column_energy", mesh->ncells, YAKL_LAMBDA(Int icell) {
+      "compute_column_energy", m_mesh->m_ncells, YAKL_LAMBDA(Int icell) {
         column_energy(icell) = 0;
         for (Int k = 0; k < max_level_cell(icell); ++k) {
           Real K = 0;
@@ -421,22 +426,22 @@ Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
 
 LinearShallowWaterModel::LinearShallowWaterModel(
     PlanarHexagonalMesh &mesh, const LinearShallowWaterParams &params)
-    : ShallowWaterModelBase(mesh, params), h0(params.h0) {}
+    : ShallowWaterModelBase(mesh, params), m_h0(params.m_h0) {}
 
 void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
                                                  RealConst2d h_cell,
                                                  RealConst2d vn_edge,
                                                  AddMode add_mode) const {
-  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
-  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(edge_sign_on_cell, mesh->edge_sign_on_cell);
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
-  YAKL_SCOPE(h0, this->h0);
+  YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
+  YAKL_SCOPE(h0, m_h0);
 
   parallel_for(
-      "compute_htend", SimpleBounds<2>(mesh->ncells, mesh->nlayers),
+      "compute_htend", SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         Real accum = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -457,18 +462,18 @@ void LinearShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                                                   RealConst2d h_cell,
                                                   RealConst2d vn_edge,
                                                   AddMode add_mode) const {
-  YAKL_SCOPE(nedges_on_edge, mesh->nedges_on_edge);
-  YAKL_SCOPE(edges_on_edge, mesh->edges_on_edge);
-  YAKL_SCOPE(weights_on_edge, mesh->weights_on_edge);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(cells_on_edge, mesh->cells_on_edge);
-  YAKL_SCOPE(max_level_edge_top, mesh->max_level_edge_top);
-  YAKL_SCOPE(grav, this->grav);
-  YAKL_SCOPE(f_edge, this->f_edge);
+  YAKL_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
+  YAKL_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
+  YAKL_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
+  YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
+  YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
+  YAKL_SCOPE(grav, m_grav);
+  YAKL_SCOPE(f_edge, m_f_edge);
 
   parallel_for(
-      "compute_vtend", SimpleBounds<2>(mesh->nedges, mesh->nlayers),
+      "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
         Real vt = -0;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
@@ -491,19 +496,19 @@ void LinearShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
 Real LinearShallowWaterModel::energy_integral(RealConst2d h_cell,
                                               RealConst2d vn_edge) const {
-  Real1d column_energy("column_energy", mesh->ncells);
+  Real1d column_energy("column_energy", m_mesh->m_ncells);
 
-  YAKL_SCOPE(nedges_on_cell, mesh->nedges_on_cell);
-  YAKL_SCOPE(edges_on_cell, mesh->edges_on_cell);
-  YAKL_SCOPE(dv_edge, mesh->dv_edge);
-  YAKL_SCOPE(dc_edge, mesh->dc_edge);
-  YAKL_SCOPE(area_cell, mesh->area_cell);
-  YAKL_SCOPE(max_level_cell, mesh->max_level_cell);
-  YAKL_SCOPE(grav, this->grav);
-  YAKL_SCOPE(h0, this->h0);
+  YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+  YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
+  YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
+  YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
+  YAKL_SCOPE(grav, m_grav);
+  YAKL_SCOPE(h0, m_h0);
 
   parallel_for(
-      "compute_column_energy", mesh->ncells, YAKL_LAMBDA(Int icell) {
+      "compute_column_energy", m_mesh->m_ncells, YAKL_LAMBDA(Int icell) {
         column_energy(icell) = 0;
         for (Int k = 0; k < max_level_cell(icell); ++k) {
           Real K = 0;

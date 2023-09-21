@@ -9,15 +9,16 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
 }
 
 struct TracerAdvection {
-  Real lx = 1;
-  Real ly = std::sqrt(3) / 2 * lx;
+  Real m_lx = 1;
+  Real m_ly = std::sqrt(3) / 2 * m_lx;
 
   YAKL_INLINE Real h(Real x, Real y, Real t) const {
-    return std::exp(std::cos(2 * pi * x));
+    return std::exp(std::cos(2 * pi * x / m_lx));
   }
 
   YAKL_INLINE Real tr(Real x, Real y, Real t) const {
-    return std::sin(2 * pi * (x - t) / lx) * std::sin(2 * pi * (y - t) / ly);
+    return std::sin(2 * pi * (x - t) / m_lx) *
+           std::sin(2 * pi * (y - t) / m_ly);
   }
 
   YAKL_INLINE Real vx(Real x, Real y, Real t) const { return 1; }
@@ -28,12 +29,12 @@ struct TracerAdvection {
 Real run(Int nx) {
   TracerAdvection advection;
 
-  PlanarHexagonalMesh mesh(nx, nx, advection.lx / nx, 1);
+  PlanarHexagonalMesh mesh(nx, nx, advection.m_lx / nx, 1);
 
   ShallowWaterParams params;
-  params.disable_h_tendency = true;
-  params.disable_vn_tendency = true;
-  params.ntracers = 1;
+  params.m_disable_h_tendency = true;
+  params.m_disable_vn_tendency = true;
+  params.m_ntracers = 1;
 
   ShallowWaterModel shallow_water(mesh, params);
 
@@ -43,32 +44,32 @@ Real run(Int nx) {
 
   Real timeend = 1;
   Real cfl = 0.5;
-  Real dt = cfl * mesh.dc;
+  Real dt = cfl * mesh.m_dc;
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  auto &h_cell = state.h_cell;
-  auto &tr_cell = state.tr_cell;
-  Real3d tr_exact_cell("tr_exact_cell", params.ntracers, mesh.ncells,
-                       mesh.nlayers);
+  auto &h_cell = state.m_h_cell;
+  auto &tr_cell = state.m_tr_cell;
+  Real3d tr_exact_cell("tr_exact_cell", params.m_ntracers, mesh.m_ncells,
+                       mesh.m_nlayers);
   parallel_for(
-      "init_h_and_tr", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
+      "init_h_and_tr", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real x = mesh.x_cell(icell);
-        Real y = mesh.y_cell(icell);
+        Real x = mesh.m_x_cell(icell);
+        Real y = mesh.m_y_cell(icell);
         h_cell(icell, k) = advection.h(x, y, 0);
         tr_cell(0, icell, k) = advection.tr(x, y, 0);
         tr_exact_cell(0, icell, k) = advection.tr(x, y, timeend);
       });
 
-  auto &vn_edge = state.vn_edge;
+  auto &vn_edge = state.m_vn_edge;
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
+      "init_vn", SimpleBounds<2>(mesh.m_nedges, mesh.m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
-        Real nx = std::cos(mesh.angle_edge(iedge));
-        Real ny = std::sin(mesh.angle_edge(iedge));
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
+        Real nx = std::cos(mesh.m_angle_edge(iedge));
+        Real ny = std::sin(mesh.m_angle_edge(iedge));
         Real vx = advection.vx(x, y, 0);
         Real vy = advection.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
@@ -80,13 +81,14 @@ Real run(Int nx) {
   }
 
   parallel_for(
-      "compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
+      "compute_error", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         tr_exact_cell(0, icell, k) -= tr_cell(0, icell, k);
         tr_exact_cell(0, icell, k) *= tr_exact_cell(0, icell, k);
       });
 
-  return std::sqrt(yakl::intrinsics::sum(tr_exact_cell) / (mesh.nx * mesh.ny));
+  return std::sqrt(yakl::intrinsics::sum(tr_exact_cell) /
+                   (mesh.m_nx * mesh.m_ny));
 }
 
 int main() {

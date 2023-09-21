@@ -6,32 +6,32 @@
 namespace omega {
 
 struct TimeStepper {
-  ShallowWaterModelBase *shallow_water;
+  ShallowWaterModelBase *m_shallow_water;
   virtual void do_step(Real t, Real dt,
                        const ShallowWaterState &state) const = 0;
   TimeStepper(ShallowWaterModelBase &shallow_water)
-      : shallow_water(&shallow_water) {}
+      : m_shallow_water(&shallow_water) {}
 };
 
 struct LSRKStepper : TimeStepper {
-  Int nstages = 5;
-  std::vector<Real> rka;
-  std::vector<Real> rkb;
-  std::vector<Real> rkc;
-  ShallowWaterState tend;
+  static constexpr Int nstages = 5;
+  std::vector<Real> m_rka;
+  std::vector<Real> m_rkb;
+  std::vector<Real> m_rkc;
+  ShallowWaterState m_tend;
 
   LSRKStepper(ShallowWaterModelBase &shallow_water);
   void do_step(Real t, Real dt, const ShallowWaterState &state) const override;
 };
 
 struct RK4Stepper : TimeStepper {
-  Int nstages = 4;
-  std::vector<Real> rka;
-  std::vector<Real> rkb;
-  std::vector<Real> rkc;
-  ShallowWaterState tend;
-  ShallowWaterState provis_state;
-  ShallowWaterState old_state;
+  static constexpr Int nstages = 4;
+  std::vector<Real> m_rka;
+  std::vector<Real> m_rkb;
+  std::vector<Real> m_rkc;
+  ShallowWaterState m_tend;
+  ShallowWaterState m_provis_state;
+  ShallowWaterState m_old_state;
 
   RK4Stepper(ShallowWaterModelBase &shallow_water);
   void do_step(Real t, Real dt, const ShallowWaterState &state) const override;

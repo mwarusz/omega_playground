@@ -9,44 +9,45 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
 }
 
 struct InertiaGravityWave {
-  Real h0 = 1000;
-  Real eta0 = 1;
-  Real grav = 9.80616;
-  Real f0 = 1e-4;
-  Real lx = 10000 * 1e3;
-  Real ly = std::sqrt(3) / 2 * lx;
-  Int mx = 2;
-  Int my = 2;
-  Real kx = mx * (2 * pi / lx);
-  Real ky = my * (2 * pi / ly);
-  Real omega = std::sqrt(f0 * f0 + grav * h0 * (kx * kx + ky * ky));
+  Real m_h0 = 1000;
+  Real m_eta0 = 1;
+  Real m_grav = 9.80616;
+  Real m_f0 = 1e-4;
+  Real m_lx = 10000 * 1e3;
+  Real m_ly = std::sqrt(3) / 2 * m_lx;
+  Int m_mx = 2;
+  Int m_my = 2;
+  Real m_kx = m_mx * (2 * pi / m_lx);
+  Real m_ky = m_my * (2 * pi / m_ly);
+  Real m_omega =
+      std::sqrt(m_f0 * m_f0 + m_grav * m_h0 * (m_kx * m_kx + m_ky * m_ky));
 
   YAKL_INLINE Real h(Real x, Real y, Real t) const {
-    return h0 + eta0 * std::cos(kx * x + ky * y - omega * t);
+    return m_h0 + m_eta0 * std::cos(m_kx * x + m_ky * y - m_omega * t);
   }
 
   YAKL_INLINE Real vx(Real x, Real y, Real t) const {
-    Real a = kx * x + ky * y - omega * t;
-    return eta0 * grav / (omega * omega - f0 * f0) *
-           (omega * kx * std::cos(a) - f0 * ky * std::sin(a));
+    Real a = m_kx * x + m_ky * y - m_omega * t;
+    return m_eta0 * m_grav / (m_omega * m_omega - m_f0 * m_f0) *
+           (m_omega * m_kx * std::cos(a) - m_f0 * m_ky * std::sin(a));
   }
 
   YAKL_INLINE Real vy(Real x, Real y, Real t) const {
-    Real a = kx * x + ky * y - omega * t;
-    return eta0 * grav / (omega * omega - f0 * f0) *
-           (omega * ky * std::cos(a) + f0 * kx * std::sin(a));
+    Real a = m_kx * x + m_ky * y - m_omega * t;
+    return m_eta0 * m_grav / (m_omega * m_omega - m_f0 * m_f0) *
+           (m_omega * m_ky * std::cos(a) + m_f0 * m_kx * std::sin(a));
   }
 };
 
 Real run(Int nx) {
   InertiaGravityWave inertia_gravity_wave;
 
-  PlanarHexagonalMesh mesh(nx, nx, inertia_gravity_wave.lx / nx, 1);
+  PlanarHexagonalMesh mesh(nx, nx, inertia_gravity_wave.m_lx / nx, 1);
 
   LinearShallowWaterParams params;
-  params.h0 = inertia_gravity_wave.h0;
-  params.f0 = inertia_gravity_wave.f0;
-  params.grav = inertia_gravity_wave.grav;
+  params.m_h0 = inertia_gravity_wave.m_h0;
+  params.m_f0 = inertia_gravity_wave.m_f0;
+  params.m_grav = inertia_gravity_wave.m_grav;
 
   LinearShallowWaterModel shallow_water(mesh, params);
 
@@ -56,29 +57,29 @@ Real run(Int nx) {
 
   Real timeend = 10 * 60 * 60;
   Real dt_per_km = 3;
-  Real dt = dt_per_km * mesh.dc / 1e3;
+  Real dt = dt_per_km * mesh.m_dc / 1e3;
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
-  auto &h_cell = state.h_cell;
-  Real2d hexact_cell("hexact_cell", mesh.ncells, mesh.nlayers);
+  auto &h_cell = state.m_h_cell;
+  Real2d hexact_cell("hexact_cell", mesh.m_ncells, mesh.m_nlayers);
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
+      "init_h", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real x = mesh.x_cell(icell);
-        Real y = mesh.y_cell(icell);
+        Real x = mesh.m_x_cell(icell);
+        Real y = mesh.m_y_cell(icell);
         h_cell(icell, k) = inertia_gravity_wave.h(x, y, 0);
         hexact_cell(icell, k) = inertia_gravity_wave.h(x, y, timeend);
       });
 
-  auto &vn_edge = state.vn_edge;
+  auto &vn_edge = state.m_vn_edge;
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh.nedges, mesh.nlayers),
+      "init_vn", SimpleBounds<2>(mesh.m_nedges, mesh.m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
-        Real nx = std::cos(mesh.angle_edge(iedge));
-        Real ny = std::sin(mesh.angle_edge(iedge));
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
+        Real nx = std::cos(mesh.m_angle_edge(iedge));
+        Real ny = std::sin(mesh.m_angle_edge(iedge));
         Real vx = inertia_gravity_wave.vx(x, y, 0);
         Real vy = inertia_gravity_wave.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
@@ -90,13 +91,14 @@ Real run(Int nx) {
   }
 
   parallel_for(
-      "compute_error", SimpleBounds<2>(mesh.ncells, mesh.nlayers),
+      "compute_error", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         hexact_cell(icell, k) -= h_cell(icell, k);
         hexact_cell(icell, k) *= hexact_cell(icell, k);
       });
 
-  return std::sqrt(yakl::intrinsics::sum(hexact_cell) / (mesh.nx * mesh.ny));
+  return std::sqrt(yakl::intrinsics::sum(hexact_cell) /
+                   (mesh.m_nx * mesh.m_ny));
 }
 
 int main() {

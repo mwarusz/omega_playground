@@ -12,33 +12,33 @@ Real error_gradient(const PlanarHexagonalMesh &mesh) {
   using std::cos;
   using std::sin;
 
-  Real Lx = mesh.period_x;
-  Real Ly = mesh.period_y;
+  Real Lx = mesh.m_period_x;
+  Real Ly = mesh.m_period_y;
 
-  Real1d input_field("input_field", mesh.ncells);
-  Real1d grad_field("grad_field", mesh.nedges);
-  Real1d exact_grad_field("exact_grad_field", mesh.nedges);
+  Real1d input_field("input_field", mesh.m_ncells);
+  Real1d grad_field("grad_field", mesh.m_nedges);
+  Real1d exact_grad_field("exact_grad_field", mesh.m_nedges);
 
   parallel_for(
-      mesh.ncells, YAKL_LAMBDA(Int icell) {
-        Real x = mesh.x_cell(icell);
-        Real y = mesh.y_cell(icell);
+      mesh.m_ncells, YAKL_LAMBDA(Int icell) {
+        Real x = mesh.m_x_cell(icell);
+        Real y = mesh.m_y_cell(icell);
         input_field(icell) = sin(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
       });
 
   parallel_for(
-      mesh.nedges, YAKL_LAMBDA(Int iedge) {
-        Int icell0 = mesh.cells_on_edge(iedge, 0);
-        Int icell1 = mesh.cells_on_edge(iedge, 1);
+      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+        Int icell0 = mesh.m_cells_on_edge(iedge, 0);
+        Int icell1 = mesh.m_cells_on_edge(iedge, 1);
 
         grad_field(iedge) =
-            (input_field(icell1) - input_field(icell0)) / mesh.dc_edge(iedge);
+            (input_field(icell1) - input_field(icell0)) / mesh.m_dc_edge(iedge);
 
-        Real nx = cos(mesh.angle_edge(iedge));
-        Real ny = sin(mesh.angle_edge(iedge));
+        Real nx = cos(mesh.m_angle_edge(iedge));
+        Real ny = sin(mesh.m_angle_edge(iedge));
 
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
 
         Real grad_x = 2 * pi / Lx * cos(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
         Real grad_y = 2 * pi / Ly * sin(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
@@ -55,20 +55,20 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
   using std::cos;
   using std::sin;
 
-  Real Lx = mesh.period_x;
-  Real Ly = mesh.period_y;
+  Real Lx = mesh.m_period_x;
+  Real Ly = mesh.m_period_y;
 
-  Real1d input_field("input_field", mesh.nedges);
-  Real1d div_field("div_field", mesh.ncells);
-  Real1d exact_div_field("exact_div_field", mesh.ncells);
+  Real1d input_field("input_field", mesh.m_nedges);
+  Real1d div_field("div_field", mesh.m_ncells);
+  Real1d exact_div_field("exact_div_field", mesh.m_ncells);
 
   parallel_for(
-      mesh.nedges, YAKL_LAMBDA(Int iedge) {
-        Real nx = cos(mesh.angle_edge(iedge));
-        Real ny = sin(mesh.angle_edge(iedge));
+      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+        Real nx = cos(mesh.m_angle_edge(iedge));
+        Real ny = sin(mesh.m_angle_edge(iedge));
 
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
 
         Real v_x = sin(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
         Real v_y = cos(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
@@ -77,17 +77,17 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
       });
 
   parallel_for(
-      mesh.ncells, YAKL_LAMBDA(Int icell) {
+      mesh.m_ncells, YAKL_LAMBDA(Int icell) {
         Real accum = -0;
-        for (Int j = 0; j < mesh.nedges_on_cell(icell); ++j) {
-          Int jedge = mesh.edges_on_cell(icell, j);
-          accum += mesh.dv_edge(jedge) * mesh.edge_sign_on_cell(icell, j) *
+        for (Int j = 0; j < mesh.m_nedges_on_cell(icell); ++j) {
+          Int jedge = mesh.m_edges_on_cell(icell, j);
+          accum += mesh.m_dv_edge(jedge) * mesh.m_edge_sign_on_cell(icell, j) *
                    input_field(jedge);
         }
-        div_field(icell) = accum / mesh.area_cell(icell);
+        div_field(icell) = accum / mesh.m_area_cell(icell);
 
-        Real x = mesh.x_cell(icell);
-        Real y = mesh.y_cell(icell);
+        Real x = mesh.m_x_cell(icell);
+        Real y = mesh.m_y_cell(icell);
         exact_div_field(icell) = 2 * pi * (1. / Lx + 1. / Ly) *
                                  cos(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
 
@@ -102,21 +102,21 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
   using std::cos;
   using std::sin;
 
-  Real Lx = mesh.period_x;
-  Real Ly = mesh.period_y;
+  Real Lx = mesh.m_period_x;
+  Real Ly = mesh.m_period_y;
 
-  Real1d input_field("input_field", mesh.nedges);
+  Real1d input_field("input_field", mesh.m_nedges);
 
-  Real1d curl_field("curl_field", mesh.nvertices);
-  Real1d exact_curl_field("exact_curl_field", mesh.nvertices);
+  Real1d curl_field("curl_field", mesh.m_nvertices);
+  Real1d exact_curl_field("exact_curl_field", mesh.m_nvertices);
 
   parallel_for(
-      mesh.nedges, YAKL_LAMBDA(Int iedge) {
-        Real nx = cos(mesh.angle_edge(iedge));
-        Real ny = sin(mesh.angle_edge(iedge));
+      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+        Real nx = cos(mesh.m_angle_edge(iedge));
+        Real ny = sin(mesh.m_angle_edge(iedge));
 
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
 
         Real v_x = sin(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
         Real v_y = cos(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
@@ -125,17 +125,17 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
       });
 
   parallel_for(
-      mesh.nvertices, YAKL_LAMBDA(Int ivertex) {
+      mesh.m_nvertices, YAKL_LAMBDA(Int ivertex) {
         Real accum = -0;
         for (Int j = 0; j < 3; ++j) {
-          Int jedge = mesh.edges_on_vertex(ivertex, j);
-          accum += mesh.dc_edge(jedge) * mesh.edge_sign_on_vertex(ivertex, j) *
-                   input_field(jedge);
+          Int jedge = mesh.m_edges_on_vertex(ivertex, j);
+          accum += mesh.m_dc_edge(jedge) *
+                   mesh.m_edge_sign_on_vertex(ivertex, j) * input_field(jedge);
         }
-        curl_field(ivertex) = accum / mesh.area_triangle(ivertex);
+        curl_field(ivertex) = accum / mesh.m_area_triangle(ivertex);
 
-        Real x = mesh.x_vertex(ivertex);
-        Real y = mesh.y_vertex(ivertex);
+        Real x = mesh.m_x_vertex(ivertex);
+        Real y = mesh.m_y_vertex(ivertex);
         exact_curl_field(ivertex) = 2 * pi * (-1. / Lx + 1. / Ly) *
                                     sin(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
 
@@ -150,24 +150,24 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
   using std::cos;
   using std::sin;
 
-  Real Lx = mesh.period_x;
-  Real Ly = mesh.period_y;
+  Real Lx = mesh.m_period_x;
+  Real Ly = mesh.m_period_y;
 
-  Real1d input_field("input_field", mesh.nedges);
+  Real1d input_field("input_field", mesh.m_nedges);
 
-  Real1d recon_field("recon_field", mesh.nedges);
-  Real1d exact_recon_field("exact_recon_field", mesh.nedges);
+  Real1d recon_field("recon_field", mesh.m_nedges);
+  Real1d exact_recon_field("exact_recon_field", mesh.m_nedges);
 
   parallel_for(
-      mesh.nedges, YAKL_LAMBDA(Int iedge) {
-        Real nx = cos(mesh.angle_edge(iedge));
-        Real ny = sin(mesh.angle_edge(iedge));
+      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+        Real nx = cos(mesh.m_angle_edge(iedge));
+        Real ny = sin(mesh.m_angle_edge(iedge));
 
         Real tx = -ny;
         Real ty = nx;
 
-        Real x = mesh.x_edge(iedge);
-        Real y = mesh.y_edge(iedge);
+        Real x = mesh.m_x_edge(iedge);
+        Real y = mesh.m_y_edge(iedge);
 
         Real v_x = sin(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
         Real v_y = cos(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
@@ -177,12 +177,12 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
       });
 
   parallel_for(
-      mesh.nedges, YAKL_LAMBDA(Int iedge) {
-        Int n = mesh.nedges_on_edge(iedge);
+      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+        Int n = mesh.m_nedges_on_edge(iedge);
         Real accum = -0;
         for (Int j = 0; j < n; ++j) {
-          Int iedge2 = mesh.edges_on_edge(iedge, j);
-          accum += mesh.weights_on_edge(iedge, j) * input_field(iedge2);
+          Int iedge2 = mesh.m_edges_on_edge(iedge, j);
+          accum += mesh.m_weights_on_edge(iedge, j) * input_field(iedge2);
         }
         recon_field(iedge) = accum;
 
