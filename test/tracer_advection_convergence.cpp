@@ -8,7 +8,7 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
   return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
 }
 
-struct TracerAdvection {
+struct TracerAdvectionTest {
   Real m_lx = 1;
   Real m_ly = std::sqrt(3) / 2 * m_lx;
 
@@ -27,9 +27,9 @@ struct TracerAdvection {
 };
 
 Real run(Int nx) {
-  TracerAdvection advection;
+  TracerAdvectionTest advection_test;
 
-  PlanarHexagonalMesh mesh(nx, nx, advection.m_lx / nx, 1);
+  PlanarHexagonalMesh mesh(nx, nx, advection_test.m_lx / nx, 1);
 
   ShallowWaterParams params;
   params.m_disable_h_tendency = true;
@@ -57,9 +57,9 @@ Real run(Int nx) {
       YAKL_LAMBDA(Int icell, Int k) {
         Real x = mesh.m_x_cell(icell);
         Real y = mesh.m_y_cell(icell);
-        h_cell(icell, k) = advection.h(x, y, 0);
-        tr_cell(0, icell, k) = advection.tr(x, y, 0);
-        tr_exact_cell(0, icell, k) = advection.tr(x, y, timeend);
+        h_cell(icell, k) = advection_test.h(x, y, 0);
+        tr_cell(0, icell, k) = advection_test.tr(x, y, 0);
+        tr_exact_cell(0, icell, k) = advection_test.tr(x, y, timeend);
       });
 
   auto &vn_edge = state.m_vn_edge;
@@ -70,8 +70,8 @@ Real run(Int nx) {
         Real y = mesh.m_y_edge(iedge);
         Real nx = std::cos(mesh.m_angle_edge(iedge));
         Real ny = std::sin(mesh.m_angle_edge(iedge));
-        Real vx = advection.vx(x, y, 0);
-        Real vy = advection.vy(x, y, 0);
+        Real vx = advection_test.vx(x, y, 0);
+        Real vy = advection_test.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 

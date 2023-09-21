@@ -8,7 +8,7 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
   return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
 }
 
-struct TracerHyperDiffusion {
+struct TracerHyperDiffusionTest {
   Real m_diff4 = 1;
   Real m_lx = 10;
   Real m_ly = std::sqrt(3) / 2 * m_lx;
@@ -27,15 +27,15 @@ struct TracerHyperDiffusion {
 };
 
 Real run(Int nx) {
-  TracerHyperDiffusion hyperdiffusion;
+  TracerHyperDiffusionTest hyperdiffusion_test;
 
-  PlanarHexagonalMesh mesh(nx, nx, hyperdiffusion.m_lx / nx, 1);
+  PlanarHexagonalMesh mesh(nx, nx, hyperdiffusion_test.m_lx / nx, 1);
 
   ShallowWaterParams params;
   params.m_disable_h_tendency = true;
   params.m_disable_vn_tendency = true;
   params.m_ntracers = 1;
-  params.m_eddy_diff4 = hyperdiffusion.m_diff4;
+  params.m_eddy_diff4 = hyperdiffusion_test.m_diff4;
 
   ShallowWaterModel shallow_water(mesh, params);
 
@@ -44,7 +44,7 @@ Real run(Int nx) {
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 2;
-  Real dt = std::pow(mesh.m_dc, 4) / (8 * hyperdiffusion.m_diff4);
+  Real dt = std::pow(mesh.m_dc, 4) / (8 * hyperdiffusion_test.m_diff4);
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -57,9 +57,9 @@ Real run(Int nx) {
       YAKL_LAMBDA(Int icell, Int k) {
         Real x = mesh.m_x_cell(icell);
         Real y = mesh.m_y_cell(icell);
-        h_cell(icell, k) = hyperdiffusion.h(x, y, 0);
-        tr_cell(0, icell, k) = hyperdiffusion.tr(x, y, 0);
-        tr_exact_cell(0, icell, k) = hyperdiffusion.tr(x, y, timeend);
+        h_cell(icell, k) = hyperdiffusion_test.h(x, y, 0);
+        tr_cell(0, icell, k) = hyperdiffusion_test.tr(x, y, 0);
+        tr_exact_cell(0, icell, k) = hyperdiffusion_test.tr(x, y, timeend);
       });
 
   auto &vn_edge = state.m_vn_edge;
@@ -70,8 +70,8 @@ Real run(Int nx) {
         Real y = mesh.m_y_edge(iedge);
         Real nx = std::cos(mesh.m_angle_edge(iedge));
         Real ny = std::sin(mesh.m_angle_edge(iedge));
-        Real vx = hyperdiffusion.vx(x, y, 0);
-        Real vy = hyperdiffusion.vy(x, y, 0);
+        Real vx = hyperdiffusion_test.vx(x, y, 0);
+        Real vy = hyperdiffusion_test.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 

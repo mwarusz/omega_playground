@@ -8,7 +8,7 @@ bool check_rate(Real rate, Real expected_rate, Real atol) {
   return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
 }
 
-struct TracerDiffusion {
+struct TracerDiffusionTest {
   Real m_diff2 = 1;
   Real m_lx = 10;
   Real m_ly = std::sqrt(3) / 2 * m_lx;
@@ -27,15 +27,15 @@ struct TracerDiffusion {
 };
 
 Real run(Int nx) {
-  TracerDiffusion diffusion;
+  TracerDiffusionTest diffusion_test;
 
-  PlanarHexagonalMesh mesh(nx, nx, diffusion.m_lx / nx, 1);
+  PlanarHexagonalMesh mesh(nx, nx, diffusion_test.m_lx / nx, 1);
 
   ShallowWaterParams params;
   params.m_disable_h_tendency = true;
   params.m_disable_vn_tendency = true;
   params.m_ntracers = 1;
-  params.m_eddy_diff2 = diffusion.m_diff2;
+  params.m_eddy_diff2 = diffusion_test.m_diff2;
 
   ShallowWaterModel shallow_water(mesh, params);
 
@@ -44,7 +44,7 @@ Real run(Int nx) {
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 2;
-  Real dt = mesh.m_dc * mesh.m_dc / (4 * diffusion.m_diff2);
+  Real dt = mesh.m_dc * mesh.m_dc / (4 * diffusion_test.m_diff2);
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -57,9 +57,9 @@ Real run(Int nx) {
       YAKL_LAMBDA(Int icell, Int k) {
         Real x = mesh.m_x_cell(icell);
         Real y = mesh.m_y_cell(icell);
-        h_cell(icell, k) = diffusion.h(x, y, 0);
-        tr_cell(0, icell, k) = diffusion.tr(x, y, 0);
-        tr_exact_cell(0, icell, k) = diffusion.tr(x, y, timeend);
+        h_cell(icell, k) = diffusion_test.h(x, y, 0);
+        tr_cell(0, icell, k) = diffusion_test.tr(x, y, 0);
+        tr_exact_cell(0, icell, k) = diffusion_test.tr(x, y, timeend);
       });
 
   auto &vn_edge = state.m_vn_edge;
@@ -70,8 +70,8 @@ Real run(Int nx) {
         Real y = mesh.m_y_edge(iedge);
         Real nx = std::cos(mesh.m_angle_edge(iedge));
         Real ny = std::sin(mesh.m_angle_edge(iedge));
-        Real vx = diffusion.vx(x, y, 0);
-        Real vy = diffusion.vy(x, y, 0);
+        Real vx = diffusion_test.vx(x, y, 0);
+        Real vy = diffusion_test.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
