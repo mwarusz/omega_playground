@@ -128,6 +128,13 @@ struct ShallowWaterModel : ShallowWaterModelBase {
 
   void compute_auxiliary_variables(RealConst2d h_cell, RealConst2d vn_edge,
                                    RealConst3d tr_cell) const override;
+  void compute_cell_auxiliary_variables(RealConst2d h_cell, RealConst2d vn_edge,
+                                        RealConst3d tr_cell) const;
+  void compute_edge_auxiliary_variables(RealConst2d h_cell, RealConst2d vn_edge,
+                                        RealConst3d tr_cell) const;
+  void compute_vertex_auxiliary_variables(RealConst2d h_cell,
+                                          RealConst2d vn_edge,
+                                          RealConst3d tr_cell) const;
 
   void compute_h_tendency(Real2d h_tend_cell, RealConst2d h_cell,
                           RealConst2d vn_edge, AddMode add_mode) const override;
