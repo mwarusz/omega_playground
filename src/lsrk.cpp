@@ -38,11 +38,14 @@ void LSRKStepper::do_step(Real t, Real dt,
     parallel_for(
         "lsrk1_v", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
         YAKL_LAMBDA(Int iedge, Int k) { vn_tend_edge(iedge, k) *= rka_stage; });
-    parallel_for(
-        "lsrk1_tr", SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          tr_tend_cell(l, icell, k) *= rka_stage;
-        });
+    if (ntracers > 0) {
+      parallel_for(
+          "lsrk1_tr",
+          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
+          YAKL_LAMBDA(Int l, Int icell, Int k) {
+            tr_tend_cell(l, icell, k) *= rka_stage;
+          });
+    }
 
     Real stagetime = t + m_rkc[stage] * dt;
     m_shallow_water->compute_tendency(m_tend, state, stagetime,
@@ -59,12 +62,15 @@ void LSRKStepper::do_step(Real t, Real dt,
         YAKL_LAMBDA(Int iedge, Int k) {
           state.m_vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
-    parallel_for(
-        "lsrk2_tr", SimpleBounds<3>(ntracers, mesh->m_nedges, mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          state.m_tr_cell(l, icell, k) +=
-              dt * rkb_stage * tr_tend_cell(l, icell, k);
-        });
+    if (ntracers > 0) {
+      parallel_for(
+          "lsrk2_tr",
+          SimpleBounds<3>(ntracers, mesh->m_nedges, mesh->m_nlayers),
+          YAKL_LAMBDA(Int l, Int icell, Int k) {
+            state.m_tr_cell(l, icell, k) +=
+                dt * rkb_stage * tr_tend_cell(l, icell, k);
+          });
+    }
   }
 }
 } // namespace omega

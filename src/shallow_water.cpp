@@ -41,10 +41,12 @@ void ShallowWaterModelBase::compute_tendency(const ShallowWaterState &tend,
   }
   yakl::timer_stop("vn_tendency");
 
-  yakl::timer_start("tr_tendency");
-  compute_tr_tendency(tend.m_tr_cell, state.m_tr_cell, state.m_vn_edge,
-                      add_mode);
-  yakl::timer_stop("tr_tendency");
+  if (m_ntracers > 0) {
+    yakl::timer_start("tr_tendency");
+    compute_tr_tendency(tend.m_tr_cell, state.m_tr_cell, state.m_vn_edge,
+                        add_mode);
+    yakl::timer_stop("tr_tendency");
+  }
 
   yakl::timer_start("additional_tendency");
   additional_tendency(tend.m_h_cell, tend.m_vn_edge, state.m_h_cell,

@@ -61,13 +61,15 @@ void RK4Stepper::do_step(Real t, Real dt,
         YAKL_LAMBDA(Int iedge, Int k) {
           state.m_vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
-    parallel_for(
-        "rk4_accumulate_tr",
-        SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          state.m_tr_cell(l, icell, k) +=
-              dt * rkb_stage * tr_tend_cell(l, icell, k);
-        });
+    if (ntracers > 0) {
+      parallel_for(
+          "rk4_accumulate_tr",
+          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
+          YAKL_LAMBDA(Int l, Int icell, Int k) {
+            state.m_tr_cell(l, icell, k) +=
+                dt * rkb_stage * tr_tend_cell(l, icell, k);
+          });
+    }
 
     if (stage < nstages - 1) {
       Real stagetime = t + m_rkc[stage] * dt;
@@ -87,14 +89,16 @@ void RK4Stepper::do_step(Real t, Real dt,
             vn_provis_edge(iedge, k) =
                 vn_old_edge(iedge, k) + dt * rka_stage * vn_tend_edge(iedge, k);
           });
-      parallel_for(
-          "rk4_compute_tr_provis",
-          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-          YAKL_LAMBDA(Int l, Int icell, Int k) {
-            tr_provis_cell(l, icell, k) =
-                tr_old_cell(l, icell, k) +
-                dt * rka_stage * tr_tend_cell(l, icell, k);
-          });
+      if (ntracers > 0) {
+        parallel_for(
+            "rk4_compute_tr_provis",
+            SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
+            YAKL_LAMBDA(Int l, Int icell, Int k) {
+              tr_provis_cell(l, icell, k) =
+                  tr_old_cell(l, icell, k) +
+                  dt * rka_stage * tr_tend_cell(l, icell, k);
+            });
+      }
 
       m_shallow_water->compute_tendency(m_tend, m_provis_state, stagetime);
     }
