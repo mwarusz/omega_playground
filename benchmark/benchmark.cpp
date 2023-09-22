@@ -95,8 +95,8 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   DoubleVortex double_vortex;
 
   Real dc = double_vortex.m_lx / nx;
-  Int ny = std::ceil(double_vortex.m_ly / (dc * std::sqrt(3) / 2));
-  PlanarHexagonalMesh mesh(nx, ny, dc);
+  Int ny = nx;
+  PlanarHexagonalMesh mesh(nx, ny, dc, nlayers);
 
   ShallowWaterParams params;
   params.m_ntracers = ntracers;
@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
   Int nx = argc > 1 ? std::stoi(argv[1]) : 64;
   Int nlayers = argc > 2 ? std::stod(argv[2]) : 64;
   Int ntracers = argc > 3 ? std::stod(argv[3]) : 1;
-  Int nsteps = argc > 4 ? std::stod(argv[4]) : 100;
+  Int nsteps = argc > 4 ? std::stod(argv[4]) : 10;
 
   run(nx, nlayers, ntracers, nsteps);
 
