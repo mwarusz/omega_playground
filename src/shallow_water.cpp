@@ -338,6 +338,9 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
   YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
   YAKL_SCOPE(vertices_on_edge, m_mesh->m_vertices_on_edge);
+  YAKL_SCOPE(edge_mask, m_mesh->m_edge_mask);
+  YAKL_SCOPE(mesh_scaling_del2, m_mesh->m_mesh_scaling_del2);
+  YAKL_SCOPE(mesh_scaling_del4, m_mesh->m_mesh_scaling_del4);
 
   YAKL_SCOPE(grav, m_grav);
   YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
@@ -452,29 +455,27 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
         // viscosity
         if (visc_del2 > 0) {
-          // TODO: add mesh scaling and edge mask
           Int ivertex0 = vertices_on_edge(iedge, 0);
           Int ivertex1 = vertices_on_edge(iedge, 1);
           Real visc2 =
-              visc_del2 *
+              visc_del2 * mesh_scaling_del2(iedge) *
               ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
                (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) /
                    dv_edge(iedge));
-          vn_tend += visc2;
+          vn_tend += visc2 * edge_mask(iedge, k);
         }
 
         // hyperviscosity
         if (visc_del4 > 0) {
           Int ivertex0 = vertices_on_edge(iedge, 0);
           Int ivertex1 = vertices_on_edge(iedge, 1);
-          // TODO: add mesh scaling and edge mask
           Real visc4 =
-              visc_del4 *
+              visc_del4 * mesh_scaling_del4(iedge) *
               ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) /
                    dc_edge(iedge) -
                (del2rvort_vertex(ivertex1, k) - del2rvort_vertex(ivertex0, k)) /
                    dv_edge(iedge));
-          vn_tend -= visc4;
+          vn_tend -= visc4 * edge_mask(iedge, k);
         }
 
         if (add_mode == AddMode::increment) {
@@ -497,6 +498,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
   YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
+  YAKL_SCOPE(mesh_scaling_del2, m_mesh->m_mesh_scaling_del2);
+  YAKL_SCOPE(mesh_scaling_del4, m_mesh->m_mesh_scaling_del4);
 
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
   YAKL_SCOPE(h_mean_edge, m_h_mean_edge);
@@ -525,7 +528,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                 dc_edge(jedge);
 
             tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       h_mean_edge(jedge, k) * grad_tr_edge;
+                       h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
+                       grad_tr_edge;
           }
           tmp_tr_del2_cell(l, icell, k) = tr_del2 / area_cell(icell);
         });
@@ -566,7 +570,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
             tr_flux -= eddy_diff4 * grad_tr_del2_edge;
           }
 
-          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
+          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux *
+                     mesh_scaling_del4(jedge);
         }
 
         if (add_mode == AddMode::increment) {

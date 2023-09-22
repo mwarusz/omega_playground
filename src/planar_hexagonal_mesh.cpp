@@ -48,6 +48,9 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   m_y_edge = Real1d("y_edge", m_nedges);
   m_z_edge = Real1d("z_edge", m_nedges);
   m_weights_on_edge = Real2d("weights_on_edge", m_nedges, 2 * maxedges);
+  m_mesh_scaling_del2 = Real1d("mesh_scaling_del2", m_nedges);
+  m_mesh_scaling_del4 = Real1d("mesh_scaling_del4", m_nedges);
+  m_edge_mask = Real2d("edge_mask", m_nedges, m_nlayers);
 
   // vertex properties
   m_max_level_vertex_bot = Int1d("max_level_vertex_bot", m_nvertices);
@@ -399,6 +402,9 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         m_lat_edge(iedge) = 0;
         m_lon_edge(iedge) = 0;
       });
+  yakl::memset(m_mesh_scaling_del2, 1);
+  yakl::memset(m_mesh_scaling_del4, 1);
+  yakl::memset(m_edge_mask, 1);
 
   parallel_for(
       "compute_vertex_arrays", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {

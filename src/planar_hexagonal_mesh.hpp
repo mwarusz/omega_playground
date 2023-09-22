@@ -49,6 +49,9 @@ struct PlanarHexagonalMesh {
   Real1d m_y_edge;
   Real1d m_z_edge;
   Real2d m_weights_on_edge;
+  Real1d m_mesh_scaling_del2;
+  Real1d m_mesh_scaling_del4;
+  Real2d m_edge_mask;
 
   Int1d m_max_level_vertex_bot;
   Int1d m_max_level_vertex_top;
