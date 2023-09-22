@@ -8,6 +8,7 @@ LSRKStepper::LSRKStepper(ShallowWaterModelBase &shallow_water)
 
   yakl::memset(m_tend.m_h_cell, 0);
   yakl::memset(m_tend.m_vn_edge, 0);
+  yakl::memset(m_tend.m_tr_cell, 0);
 
   m_rka = {0., -567301805773. / 1357537059087.,
            -2404267990393. / 2016746695238., -3550918686646. / 2091501179385.,

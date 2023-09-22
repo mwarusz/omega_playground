@@ -106,7 +106,7 @@ ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
                                      Int ntracers)
     : m_h_cell("h_cell", mesh.m_ncells, mesh.m_nlayers),
       m_vn_edge("vn_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_tr_cell("tr_cell", ntracers, mesh.m_nedges, mesh.m_nlayers) {}
+      m_tr_cell("tr_cell", ntracers, mesh.m_ncells, mesh.m_nlayers) {}
 
 ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
     : ShallowWaterState(*sw.m_mesh, sw.m_ntracers) {}
