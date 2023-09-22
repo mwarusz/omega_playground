@@ -27,5 +27,7 @@ target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+add_subdirectory(benchmark)
+
 enable_testing()
 add_subdirectory(test)
