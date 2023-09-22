@@ -149,6 +149,7 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
   YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
   YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+  YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
   YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
   YAKL_SCOPE(vertices_on_cell, m_mesh->m_vertices_on_cell);
@@ -173,7 +174,8 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
           Int jedge = edges_on_cell(icell, j);
           Real area_edge = dv_edge(jedge) * dc_edge(jedge);
           ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
-          div += dv_edge(jedge) * vn_edge(jedge, k);
+          div +=
+              dv_edge(jedge) * edge_sign_on_cell(icell, j) * vn_edge(jedge, k);
 
           // Int jvertex = vertices_on_cell(icell, j);
           // Int jkite = kite_index_on_cell(icell, j);
@@ -363,6 +365,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
     YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
     YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+    YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
     YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
     YAKL_SCOPE(edges_on_vertex, m_mesh->m_edges_on_vertex);
     YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
@@ -397,7 +400,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Real del2div = -0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
-            del2div += dv_edge(jedge) * del2u_edge(jedge, k);
+            del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                       del2u_edge(jedge, k);
           }
           del2div /= area_cell(icell);
           del2div_cell(icell, k) = del2div;
