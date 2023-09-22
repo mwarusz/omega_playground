@@ -12,6 +12,7 @@ struct ShallowWaterParams {
   Real m_grav = 9.81;
   Real m_drag_coeff = 0;
   Real m_visc_del2 = 0;
+  Real m_visc_del4 = 0;
   Real m_eddy_diff2 = 0;
   Real m_eddy_diff4 = 0;
   Int m_ntracers = 0;
@@ -76,6 +77,7 @@ struct ShallowWaterModelBase {
 struct ShallowWaterModel : ShallowWaterModelBase {
   Real m_drag_coeff;
   Real m_visc_del2;
+  Real m_visc_del4;
   Real m_eddy_diff2;
   Real m_eddy_diff4;
 

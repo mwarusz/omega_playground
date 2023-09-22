@@ -116,8 +116,8 @@ ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
 ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
                                      const ShallowWaterParams &params)
     : ShallowWaterModelBase(mesh, params), m_drag_coeff(params.m_drag_coeff),
-      m_visc_del2(params.m_visc_del2), m_eddy_diff2(params.m_eddy_diff2),
-      m_eddy_diff4(params.m_eddy_diff4),
+      m_visc_del2(params.m_visc_del2), m_visc_del4(params.m_visc_del4),
+      m_eddy_diff2(params.m_eddy_diff2), m_eddy_diff4(params.m_eddy_diff4),
       m_ke_cell("ke_cell", mesh.m_ncells, mesh.m_nlayers),
       m_div_cell("div_cell", mesh.m_ncells, mesh.m_nlayers),
       // m_rvort_cell("rvort_cell", mesh.m_ncells, mesh.m_nlayers),
@@ -349,6 +349,72 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
   YAKL_SCOPE(drag_coeff, m_drag_coeff);
   YAKL_SCOPE(visc_del2, m_visc_del2);
+  YAKL_SCOPE(visc_del4, m_visc_del4);
+
+  Real2d del2u_edge, del2rvort_vertex, del2div_cell;
+  if (visc_del4 > 0) {
+    del2u_edge = Real2d("del2u_edge", m_mesh->m_nedges, m_mesh->m_nlayers);
+    del2rvort_vertex =
+        Real2d("del2rvort_vertex", m_mesh->m_nvertices, m_mesh->m_nlayers);
+    del2div_cell = Real2d("del2div_cell", m_mesh->m_ncells, m_mesh->m_nlayers);
+
+    YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
+    YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
+    YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
+    YAKL_SCOPE(edges_on_vertex, m_mesh->m_edges_on_vertex);
+    YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
+    YAKL_SCOPE(edge_sign_on_vertex, m_mesh->m_edge_sign_on_vertex);
+
+    parallel_for(
+        "compute_del2u_edge",
+        SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
+        YAKL_LAMBDA(Int iedge, Int k) {
+          Int icell0 = cells_on_edge(iedge, 0);
+          Int icell1 = cells_on_edge(iedge, 1);
+
+          Int ivertex0 = vertices_on_edge(iedge, 0);
+          Int ivertex1 = vertices_on_edge(iedge, 1);
+
+          Real dc_edge_inv = 1._fp / dc_edge(iedge);
+          Real dv_edge_inv =
+              1._fp / std::max(dv_edge(iedge), 0.25_fp * dc_edge(iedge)); // huh
+
+          Real del2u =
+              ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
+               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
+                   dv_edge_inv);
+
+          del2u_edge(iedge, k) = del2u;
+        });
+
+    parallel_for(
+        "compute_del2div_cell",
+        SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
+        YAKL_LAMBDA(Int icell, Int k) {
+          Real del2div = -0;
+          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+            Int jedge = edges_on_cell(icell, j);
+            del2div += dv_edge(jedge) * del2u_edge(jedge, k);
+          }
+          del2div /= area_cell(icell);
+          del2div_cell(icell, k) = del2div;
+        });
+
+    parallel_for(
+        "compute_del2rvort_vertex",
+        SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
+        YAKL_LAMBDA(Int ivertex, Int k) {
+          Real del2rvort = -0;
+          for (Int j = 0; j < 3; ++j) {
+            Int jedge = edges_on_vertex(ivertex, j);
+            del2rvort += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
+                         vn_edge(jedge, k);
+          }
+          del2rvort /= area_triangle(ivertex);
+
+          del2rvort_vertex(ivertex, k) = del2rvort;
+        });
+  }
 
   parallel_for(
       "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
@@ -384,8 +450,9 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
         vn_tend = qt - grad_B + drag_force;
 
+        // viscosity
         if (visc_del2 > 0) {
-          // TODO: add mesh scaling
+          // TODO: add mesh scaling and edge mask
           Int ivertex0 = vertices_on_edge(iedge, 0);
           Int ivertex1 = vertices_on_edge(iedge, 1);
           Real visc2 =
@@ -394,6 +461,20 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) /
                    dv_edge(iedge));
           vn_tend += visc2;
+        }
+
+        // hyperviscosity
+        if (visc_del4 > 0) {
+          Int ivertex0 = vertices_on_edge(iedge, 0);
+          Int ivertex1 = vertices_on_edge(iedge, 1);
+          // TODO: add mesh scaling and edge mask
+          Real visc4 =
+              visc_del4 *
+              ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) /
+                   dc_edge(iedge) -
+               (del2rvort_vertex(ivertex1, k) - del2rvort_vertex(ivertex0, k)) /
+                   dv_edge(iedge));
+          vn_tend -= visc4;
         }
 
         if (add_mode == AddMode::increment) {
