@@ -3,7 +3,7 @@
 
 namespace omega {
 
-FileMesh::FileMesh(const char *filename, Int nlayers) {
+FileMesh::FileMesh(const std::string &filename, Int nlayers) {
   m_nlayers = nlayers;
 
   yakl::SimpleNetCDF nc;

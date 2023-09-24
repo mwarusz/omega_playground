@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <omega.hpp>
 #include <vector>
 
@@ -29,7 +30,8 @@ struct TracerHyperDiffusionTest {
 Real run(Int nx) {
   TracerHyperDiffusionTest hyperdiffusion_test;
 
-  PlanarHexagonalMesh mesh(nx, nx, hyperdiffusion_test.m_lx / nx, 1);
+  auto mesh = std::make_unique<PlanarHexagonalMesh>(
+      nx, nx, hyperdiffusion_test.m_lx / nx, 1);
 
   ShallowWaterParams params;
   params.m_disable_h_tendency = true;
@@ -37,39 +39,44 @@ Real run(Int nx) {
   params.m_ntracers = 1;
   params.m_eddy_diff4 = hyperdiffusion_test.m_diff4;
 
-  ShallowWaterModel shallow_water(mesh, params);
+  ShallowWaterModel shallow_water(mesh.get(), params);
 
   ShallowWaterState state(shallow_water);
 
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 2;
-  Real dt = std::pow(mesh.m_dc, 4) / (8 * hyperdiffusion_test.m_diff4);
+  Real dt = std::pow(mesh->m_dc, 4) / (8 * hyperdiffusion_test.m_diff4);
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
   auto &h_cell = state.m_h_cell;
   auto &tr_cell = state.m_tr_cell;
-  Real3d tr_exact_cell("tr_exact_cell", params.m_ntracers, mesh.m_ncells,
-                       mesh.m_nlayers);
+  Real3d tr_exact_cell("tr_exact_cell", params.m_ntracers, mesh->m_ncells,
+                       mesh->m_nlayers);
+  YAKL_SCOPE(x_cell, mesh->m_x_cell);
+  YAKL_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h_and_tr", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
+      "init_h_and_tr", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real x = mesh.m_x_cell(icell);
-        Real y = mesh.m_y_cell(icell);
+        Real x = x_cell(icell);
+        Real y = y_cell(icell);
         h_cell(icell, k) = hyperdiffusion_test.h(x, y, 0);
         tr_cell(0, icell, k) = hyperdiffusion_test.tr(x, y, 0);
         tr_exact_cell(0, icell, k) = hyperdiffusion_test.tr(x, y, timeend);
       });
 
   auto &vn_edge = state.m_vn_edge;
+  YAKL_SCOPE(x_edge, mesh->m_x_edge);
+  YAKL_SCOPE(y_edge, mesh->m_y_edge);
+  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh.m_nedges, mesh.m_nlayers),
+      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
-        Real x = mesh.m_x_edge(iedge);
-        Real y = mesh.m_y_edge(iedge);
-        Real nx = std::cos(mesh.m_angle_edge(iedge));
-        Real ny = std::sin(mesh.m_angle_edge(iedge));
+        Real x = x_edge(iedge);
+        Real y = y_edge(iedge);
+        Real nx = std::cos(angle_edge(iedge));
+        Real ny = std::sin(angle_edge(iedge));
         Real vx = hyperdiffusion_test.vx(x, y, 0);
         Real vy = hyperdiffusion_test.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
@@ -81,14 +88,14 @@ Real run(Int nx) {
   }
 
   parallel_for(
-      "compute_error", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
+      "compute_error", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         tr_exact_cell(0, icell, k) -= tr_cell(0, icell, k);
         tr_exact_cell(0, icell, k) *= tr_exact_cell(0, icell, k);
       });
 
   return std::sqrt(yakl::intrinsics::sum(tr_exact_cell) /
-                   (mesh.m_nx * mesh.m_ny));
+                   (mesh->m_nx * mesh->m_ny));
 }
 
 int main() {

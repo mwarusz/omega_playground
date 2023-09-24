@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <omega.hpp>
 #include <vector>
 
@@ -65,8 +66,7 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
   ManufacturedSolution m_manufactured_solution;
 
   ManufacturedShallowWaterModel(
-      PlanarHexagonalMesh &mesh,
-      const ManufacturedSolution &manufactured_solution)
+      MPASMesh *mesh, const ManufacturedSolution &manufactured_solution)
       : ShallowWaterModel(mesh,
                           ShallowWaterParams{manufactured_solution.m_f0,
                                              manufactured_solution.m_grav, 0}),
@@ -117,9 +117,11 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
 Real run(Int n) {
   ManufacturedSolution manufactured_solution;
 
-  PlanarHexagonalMesh mesh(n, n, manufactured_solution.m_lx / n);
+  auto mesh = std::make_unique<PlanarHexagonalMesh>(
+      n, n, manufactured_solution.m_lx / n);
 
-  ManufacturedShallowWaterModel shallow_water(mesh, manufactured_solution);
+  ManufacturedShallowWaterModel shallow_water(mesh.get(),
+                                              manufactured_solution);
 
   ShallowWaterState state(shallow_water);
 
@@ -127,29 +129,34 @@ Real run(Int n) {
 
   Real timeend = 10 * 60 * 60;
   Real dt_per_km = 3;
-  Real dt = dt_per_km * mesh.m_dc / 1e3;
+  Real dt = dt_per_km * mesh->m_dc / 1e3;
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
   auto &h_cell = state.m_h_cell;
-  Real2d hexact_cell("hexact_cell", mesh.m_ncells, mesh.m_nlayers);
+  Real2d hexact_cell("hexact_cell", mesh->m_ncells, mesh->m_nlayers);
+  YAKL_SCOPE(x_cell, mesh->m_x_cell);
+  YAKL_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
+      "init_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real x = mesh.m_x_cell(icell);
-        Real y = mesh.m_y_cell(icell);
+        Real x = x_cell(icell);
+        Real y = y_cell(icell);
         h_cell(icell, k) = manufactured_solution.h(x, y, 0);
         hexact_cell(icell, k) = manufactured_solution.h(x, y, timeend);
       });
 
   auto &vn_edge = state.m_vn_edge;
+  YAKL_SCOPE(x_edge, mesh->m_x_edge);
+  YAKL_SCOPE(y_edge, mesh->m_y_edge);
+  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh.m_nedges, mesh.m_nlayers),
+      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
-        Real x = mesh.m_x_edge(iedge);
-        Real y = mesh.m_y_edge(iedge);
-        Real nx = std::cos(mesh.m_angle_edge(iedge));
-        Real ny = std::sin(mesh.m_angle_edge(iedge));
+        Real x = x_edge(iedge);
+        Real y = y_edge(iedge);
+        Real nx = std::cos(angle_edge(iedge));
+        Real ny = std::sin(angle_edge(iedge));
         Real vx = manufactured_solution.vx(x, y, 0);
         Real vy = manufactured_solution.vy(x, y, 0);
         vn_edge(iedge, k) = nx * vx + ny * vy;
@@ -161,14 +168,14 @@ Real run(Int n) {
   }
 
   parallel_for(
-      "compute_error", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
+      "compute_error", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
         hexact_cell(icell, k) -= h_cell(icell, k);
         hexact_cell(icell, k) *= hexact_cell(icell, k);
       });
 
   return std::sqrt(yakl::intrinsics::sum(hexact_cell) /
-                   (mesh.m_nx * mesh.m_ny));
+                   (mesh->m_nx * mesh->m_ny));
 }
 
 int main() {

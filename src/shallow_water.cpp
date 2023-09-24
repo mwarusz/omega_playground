@@ -4,13 +4,13 @@ namespace omega {
 
 // Base
 
-ShallowWaterModelBase::ShallowWaterModelBase(PlanarHexagonalMesh &mesh,
+ShallowWaterModelBase::ShallowWaterModelBase(MPASMesh *mesh,
                                              const ShallowWaterParams &params)
-    : m_mesh(&mesh), m_grav(params.m_grav),
+    : m_mesh(mesh), m_grav(params.m_grav),
       m_disable_h_tendency(params.m_disable_h_tendency),
       m_disable_vn_tendency(params.m_disable_vn_tendency),
-      m_ntracers(params.m_ntracers), m_f_vertex("f_vertex", mesh.m_nvertices),
-      m_f_edge("f_edge", mesh.m_nedges) {
+      m_ntracers(params.m_ntracers), m_f_vertex("f_vertex", mesh->m_nvertices),
+      m_f_edge("f_edge", mesh->m_nedges) {
   yakl::memset(m_f_vertex, params.m_f0);
   yakl::memset(m_f_edge, params.m_f0);
 }
@@ -102,39 +102,38 @@ Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
 
 // State
 
-ShallowWaterState::ShallowWaterState(const PlanarHexagonalMesh &mesh,
-                                     Int ntracers)
-    : m_h_cell("h_cell", mesh.m_ncells, mesh.m_nlayers),
-      m_vn_edge("vn_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_tr_cell("tr_cell", ntracers, mesh.m_ncells, mesh.m_nlayers) {}
+ShallowWaterState::ShallowWaterState(MPASMesh *mesh, Int ntracers)
+    : m_h_cell("h_cell", mesh->m_ncells, mesh->m_nlayers),
+      m_vn_edge("vn_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_tr_cell("tr_cell", ntracers, mesh->m_ncells, mesh->m_nlayers) {}
 
 ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
-    : ShallowWaterState(*sw.m_mesh, sw.m_ntracers) {}
+    : ShallowWaterState(sw.m_mesh, sw.m_ntracers) {}
 
 // Nonlinear
 
-ShallowWaterModel::ShallowWaterModel(PlanarHexagonalMesh &mesh,
+ShallowWaterModel::ShallowWaterModel(MPASMesh *mesh,
                                      const ShallowWaterParams &params)
     : ShallowWaterModelBase(mesh, params), m_drag_coeff(params.m_drag_coeff),
       m_visc_del2(params.m_visc_del2), m_visc_del4(params.m_visc_del4),
       m_eddy_diff2(params.m_eddy_diff2), m_eddy_diff4(params.m_eddy_diff4),
-      m_ke_cell("ke_cell", mesh.m_ncells, mesh.m_nlayers),
-      m_div_cell("div_cell", mesh.m_ncells, mesh.m_nlayers),
-      // m_rvort_cell("rvort_cell", mesh.m_ncells, mesh.m_nlayers),
-      // m_norm_rvort_cell("norm_rvort_cell", mesh.m_ncells, mesh.m_nlayers),
-      m_norm_tr_cell("norm_tr_cell", params.m_ntracers, mesh.m_ncells,
-                     mesh.m_nlayers),
-      m_h_flux_edge("h_flux_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_h_mean_edge("h_mean_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_h_drag_edge("h_drag_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_vt_edge("vt_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_norm_rvort_edge("norm_rvort_edge", mesh.m_nedges, mesh.m_nlayers),
-      m_norm_f_edge("norm_f_edge", mesh.m_nedges, mesh.m_nlayers),
-      // m_rcirc_vertex("rcirc_vertex", mesh.m_nvertices, mesh.m_nlayers),
-      m_rvort_vertex("rvort_vertex", mesh.m_nvertices, mesh.m_nlayers),
-      m_norm_rvort_vertex("norm_rvort_vertex", mesh.m_nvertices,
-                          mesh.m_nlayers),
-      m_norm_f_vertex("norm_f_vertex", mesh.m_nvertices, mesh.m_nlayers) {}
+      m_ke_cell("ke_cell", mesh->m_ncells, mesh->m_nlayers),
+      m_div_cell("div_cell", mesh->m_ncells, mesh->m_nlayers),
+      // m_rvort_cell("rvort_cell", mesh->m_ncells, mesh->m_nlayers),
+      // m_norm_rvort_cell("norm_rvort_cell", mesh->m_ncells, mesh->m_nlayers),
+      m_norm_tr_cell("norm_tr_cell", params.m_ntracers, mesh->m_ncells,
+                     mesh->m_nlayers),
+      m_h_flux_edge("h_flux_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_h_mean_edge("h_mean_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_h_drag_edge("h_drag_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_vt_edge("vt_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_norm_rvort_edge("norm_rvort_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_norm_f_edge("norm_f_edge", mesh->m_nedges, mesh->m_nlayers),
+      // m_rcirc_vertex("rcirc_vertex", mesh->m_nvertices, mesh->m_nlayers),
+      m_rvort_vertex("rvort_vertex", mesh->m_nvertices, mesh->m_nlayers),
+      m_norm_rvort_vertex("norm_rvort_vertex", mesh->m_nvertices,
+                          mesh->m_nlayers),
+      m_norm_f_vertex("norm_f_vertex", mesh->m_nvertices, mesh->m_nlayers) {}
 
 void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
                                                     RealConst2d vn_edge,
@@ -622,7 +621,7 @@ Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
 // Linear
 
 LinearShallowWaterModel::LinearShallowWaterModel(
-    PlanarHexagonalMesh &mesh, const LinearShallowWaterParams &params)
+    MPASMesh *mesh, const LinearShallowWaterParams &params)
     : ShallowWaterModelBase(mesh, params), m_h0(params.m_h0) {}
 
 void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,

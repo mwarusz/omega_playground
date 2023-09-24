@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <omega.hpp>
 #include <string>
 
@@ -96,7 +97,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
 
   Real dc = double_vortex.m_lx / nx;
   Int ny = nx;
-  PlanarHexagonalMesh mesh(nx, ny, dc, nlayers);
+  auto mesh = std::make_unique<PlanarHexagonalMesh>(nx, ny, dc, nlayers);
 
   ShallowWaterParams params;
   params.m_ntracers = ntracers;
@@ -108,7 +109,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   params.m_eddy_diff2 = 1e-5;
   params.m_eddy_diff4 = 1e-5;
 
-  ShallowWaterModel shallow_water(mesh, params);
+  ShallowWaterModel shallow_water(mesh.get(), params);
 
   ShallowWaterState state(shallow_water);
 
@@ -116,33 +117,38 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
 
   Real cfl = 0.1;
   Real dt =
-      cfl * mesh.m_dc / std::sqrt(shallow_water.m_grav * double_vortex.m_h0);
+      cfl * mesh->m_dc / std::sqrt(shallow_water.m_grav * double_vortex.m_h0);
   Int numberofsteps = nsteps;
 
   auto &h_cell = state.m_h_cell;
   auto &tr_cell = state.m_tr_cell;
+  YAKL_SCOPE(x_cell, mesh->m_x_cell);
+  YAKL_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh.m_ncells, mesh.m_nlayers),
+      "init_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real x = mesh.m_x_cell(icell);
-        Real y = mesh.m_y_cell(icell);
+        Real x = x_cell(icell);
+        Real y = y_cell(icell);
         h_cell(icell, k) = double_vortex.h(x, y);
       });
 
   if (ntracers > 0) {
     parallel_for(
-        "init_tr", SimpleBounds<3>(ntracers, mesh.m_ncells, mesh.m_nlayers),
+        "init_tr", SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
         YAKL_LAMBDA(Int l, Int icell, Int k) { tr_cell(l, icell, k) = 1000; });
   }
 
   auto &vn_edge = state.m_vn_edge;
+  YAKL_SCOPE(x_edge, mesh->m_x_edge);
+  YAKL_SCOPE(y_edge, mesh->m_y_edge);
+  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh.m_nedges, mesh.m_nlayers),
+      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
-        Real x = mesh.m_x_edge(iedge);
-        Real y = mesh.m_y_edge(iedge);
-        Real nx = std::cos(mesh.m_angle_edge(iedge));
-        Real ny = std::sin(mesh.m_angle_edge(iedge));
+        Real x = x_edge(iedge);
+        Real y = y_edge(iedge);
+        Real nx = std::cos(angle_edge(iedge));
+        Real ny = std::sin(angle_edge(iedge));
         Real vx = double_vortex.vx(x, y);
         Real vy = double_vortex.vy(x, y);
         vn_edge(iedge, k) = nx * vx + ny * vy;
