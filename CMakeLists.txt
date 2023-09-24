@@ -17,7 +17,9 @@ FetchContent_Declare(yakl
 FetchContent_MakeAvailable(yakl)
 
 add_library(omega
+  src/mpas_mesh.cpp
   src/planar_hexagonal_mesh.cpp
+  src/file_mesh.cpp
   src/shallow_water.cpp
   src/lsrk.cpp
   src/rk4.cpp
@@ -26,6 +28,7 @@ yakl_process_target(omega)
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+target_link_libraries(omega netcdf)
 
 add_subdirectory(benchmark)
 

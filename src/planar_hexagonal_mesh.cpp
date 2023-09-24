@@ -6,8 +6,9 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Int nlayers)
     : PlanarHexagonalMesh(nx, ny, 1. / nx, nlayers) {}
 
 PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
-    : m_nx(nx), m_ny(ny), m_dc(dc), m_nlayers(nlayers) {
+    : m_nx(nx), m_ny(ny), m_dc(dc) {
 
+  m_nlayers = nlayers;
   m_ncells = nx * ny;
   m_nedges = 3 * m_ncells;
   m_nvertices = 2 * m_ncells;
@@ -16,12 +17,9 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
 
   // cell properties
   m_nedges_on_cell = Int1d("nedges_on_cell", m_ncells);
-  m_max_level_cell = Int1d("max_level_cell", m_ncells);
   m_cells_on_cell = Int2d("cells_on_cell", m_ncells, maxedges);
   m_edges_on_cell = Int2d("edges_on_cell", m_ncells, maxedges);
   m_vertices_on_cell = Int2d("vertices_on_cell", m_ncells, maxedges);
-  m_edge_sign_on_cell = Int2d("edge_sign_on_cell", m_ncells, maxedges);
-  m_kite_index_on_cell = Int2d("kite_index_on_cell", m_ncells, maxedges);
 
   m_area_cell = Real1d("area_cell", m_ncells);
   m_lat_cell = Real1d("lat_cell", m_ncells);
@@ -33,8 +31,6 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
 
   // edge properties
   m_nedges_on_edge = Int1d("nedges_on_edge", m_nedges);
-  m_max_level_edge_bot = Int1d("max_level_edge_bot", m_nedges);
-  m_max_level_edge_top = Int1d("max_level_edge_top", m_nedges);
   m_cells_on_edge = Int2d("cells_on_edge", m_nedges, 2);
   m_vertices_on_edge = Int2d("vertices_on_edge", m_nedges, 2);
   m_edges_on_edge = Int2d("edges_on_edge", m_nedges, 2 * maxedges);
@@ -48,16 +44,10 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   m_y_edge = Real1d("y_edge", m_nedges);
   m_z_edge = Real1d("z_edge", m_nedges);
   m_weights_on_edge = Real2d("weights_on_edge", m_nedges, 2 * maxedges);
-  m_mesh_scaling_del2 = Real1d("mesh_scaling_del2", m_nedges);
-  m_mesh_scaling_del4 = Real1d("mesh_scaling_del4", m_nedges);
-  m_edge_mask = Real2d("edge_mask", m_nedges, m_nlayers);
 
   // vertex properties
-  m_max_level_vertex_bot = Int1d("max_level_vertex_bot", m_nvertices);
-  m_max_level_vertex_top = Int1d("max_level_vertex_top", m_nvertices);
   m_edges_on_vertex = Int2d("edges_on_vertex", m_nvertices, 3);
   m_cells_on_vertex = Int2d("cells_on_vertex", m_nvertices, 3);
-  m_edge_sign_on_vertex = Int2d("edge_sign_on_vertex", m_nvertices, 3);
 
   m_area_triangle = Real1d("area_triangle", m_nvertices);
   m_lat_vertex = Real1d("lat_vertex", m_nvertices);
@@ -378,20 +368,6 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         m_y_vertex(m_vertices_on_cell(icell, 1)) =
             m_y_cell(icell) - m_dc * sqrt(3) / 6;
         m_z_vertex(m_vertices_on_cell(icell, 1)) = 0;
-
-        for (Int j = 0; j < maxedges; ++j) {
-          m_edge_sign_on_cell(icell, j) =
-              m_cells_on_edge(m_edges_on_cell(icell, j), 0) == icell ? 1 : -1;
-        }
-
-        for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
-          Int jvertex = m_vertices_on_cell(icell, j);
-          for (Int l = 0; l < 3; ++l) {
-            if (m_cells_on_vertex(jvertex, l) == icell) {
-              m_kite_index_on_cell(icell, j) = l;
-            }
-          }
-        }
       });
 
   parallel_for(
@@ -402,9 +378,6 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         m_lat_edge(iedge) = 0;
         m_lon_edge(iedge) = 0;
       });
-  yakl::memset(m_mesh_scaling_del2, 1);
-  yakl::memset(m_mesh_scaling_del4, 1);
-  yakl::memset(m_edge_mask, 1);
 
   parallel_for(
       "compute_vertex_arrays", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {
@@ -414,19 +387,8 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         for (Int j = 0; j < 3; ++j) {
           m_kiteareas_on_vertex(ivertex, j) = m_dc * m_dc * sqrt(3) / 12;
         }
-
-        for (Int j = 0; j < 3; ++j) {
-          m_edge_sign_on_vertex(ivertex, j) =
-              m_vertices_on_edge(m_edges_on_vertex(ivertex, j), 0) == ivertex
-                  ? -1
-                  : 1;
-        }
       });
 
-  yakl::memset(m_max_level_cell, m_nlayers);
-  yakl::memset(m_max_level_edge_bot, m_nlayers);
-  yakl::memset(m_max_level_edge_top, m_nlayers);
-  yakl::memset(m_max_level_vertex_bot, m_nlayers);
-  yakl::memset(m_max_level_vertex_top, m_nlayers);
+  finalize_mesh();
 }
 } // namespace omega
