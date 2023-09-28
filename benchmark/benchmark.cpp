@@ -112,7 +112,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
 
   ShallowWaterState state(shallow_water);
 
-  LSRKStepper stepper(shallow_water);
+  LSRKStepper stepper(shallow_water, 1);
 
   Real cfl = 0.1;
   Real dt =

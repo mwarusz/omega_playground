@@ -14,13 +14,13 @@ struct TimeStepper {
 };
 
 struct LSRKStepper : TimeStepper {
-  static constexpr Int nstages = 5;
+  Int m_nstages;
   std::vector<Real> m_rka;
   std::vector<Real> m_rkb;
   std::vector<Real> m_rkc;
   ShallowWaterState m_tend;
 
-  LSRKStepper(ShallowWaterModelBase &shallow_water);
+  LSRKStepper(ShallowWaterModelBase &shallow_water, Int nstages = 5);
   void do_step(Real t, Real dt, const ShallowWaterState &state) const override;
 };
 
