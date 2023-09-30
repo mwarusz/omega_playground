@@ -74,7 +74,7 @@ void LSRKStepper::do_step(Real t, Real dt,
     if (ntracers > 0) {
       parallel_for(
           "lsrk2_tr",
-          SimpleBounds<3>(ntracers, mesh->m_nedges, mesh->m_nlayers),
+          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
           YAKL_LAMBDA(Int l, Int icell, Int k) {
             state.m_tr_cell(l, icell, k) +=
                 dt * rkb_stage * tr_tend_cell(l, icell, k);
