@@ -83,4 +83,35 @@ FileMesh::FileMesh(const std::string &filename, Int nlayers) {
   finalize_mesh();
 }
 
+void FileMesh::rescale_radius(Real radius) const {
+  Real radius2 = radius * radius;
+  parallel_for(
+      "rescale_cell", m_ncells, YAKL_CLASS_LAMBDA(Int icell) {
+        m_x_cell(icell) *= radius;
+        m_y_cell(icell) *= radius;
+        m_z_cell(icell) *= radius;
+        m_area_cell(icell) *= radius2;
+      });
+
+  parallel_for(
+      "rescale_vertex", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {
+        m_x_vertex(ivertex) *= radius;
+        m_y_vertex(ivertex) *= radius;
+        m_z_vertex(ivertex) *= radius;
+        m_area_triangle(ivertex) *= radius2;
+        for (Int j = 0; j < 3; ++j) {
+          m_kiteareas_on_vertex(ivertex, j) *= radius2;
+        }
+      });
+
+  parallel_for(
+      "rescale_edge", m_nedges, YAKL_CLASS_LAMBDA(Int iedge) {
+        m_x_edge(iedge) *= radius;
+        m_y_edge(iedge) *= radius;
+        m_z_edge(iedge) *= radius;
+        m_dc_edge(iedge) *= radius;
+        m_dv_edge(iedge) *= radius;
+      });
+}
+
 } // namespace omega
