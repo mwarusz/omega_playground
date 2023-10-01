@@ -4,6 +4,8 @@ project(omega_playground CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+
 if ("${YAKL_ARCH}" STREQUAL "CUDA")
   enable_language(CUDA)
 endif()
@@ -13,6 +15,8 @@ FetchContent_Declare(yakl
   GIT_REPOSITORY https://github.com/mrnorman/YAKL.git
   GIT_TAG main
 )
+
+find_package(NetCDF REQUIRED)
 
 FetchContent_MakeAvailable(yakl)
 
@@ -28,7 +32,7 @@ yakl_process_target(omega)
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-target_link_libraries(omega netcdf)
+target_link_libraries(omega NetCDF::NetCDF)
 
 add_subdirectory(benchmark)
 add_subdirectory(experiment)
