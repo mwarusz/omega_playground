@@ -4,8 +4,9 @@
 
 using namespace omega;
 
-constexpr Real earth_radius = 6.37122e6;
-constexpr Real day = 24 * 60 * 60;
+constexpr Real shrink_factor = 120;
+constexpr Real earth_radius = 6.37122e6 / shrink_factor;
+constexpr Real day = 24 * 60 * 60 / shrink_factor;
 
 bool check_rate(Real rate, Real expected_rate, Real atol) {
   return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
@@ -63,9 +64,9 @@ Real run(Int l) {
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 12 * day;
-  Real cfl = 0.5;
-  Real h = yakl::intrinsics::minval(mesh->m_dc_edge);
-  Real dt = cfl * h / cosine_bell.m_u0;
+  Real cfl = 0.6;
+  Real min_dc_edge = yakl::intrinsics::minval(mesh->m_dc_edge);
+  Real dt = cfl * min_dc_edge / cosine_bell.m_u0;
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -111,15 +112,21 @@ Real run(Int l) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
+  std::cout << "cosine bell extrema: " << yakl::intrinsics::minval(tr_cell)
+            << " " << yakl::intrinsics::maxval(tr_cell) << std::endl;
 
+  YAKL_SCOPE(area_cell, mesh->m_area_cell);
   parallel_for(
       "compute_error", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        tr_exact_cell(0, icell, k) -= tr_cell(0, icell, k);
-        tr_exact_cell(0, icell, k) *= tr_exact_cell(0, icell, k);
+        tr_cell(0, icell, k) -= tr_exact_cell(0, icell, k);
+        tr_cell(0, icell, k) *= area_cell(icell) * tr_cell(0, icell, k);
+        tr_exact_cell(0, icell, k) *=
+            area_cell(icell) * tr_exact_cell(0, icell, k);
       });
 
-  return std::sqrt(yakl::intrinsics::sum(tr_exact_cell) / mesh->m_ncells);
+  return std::sqrt(yakl::intrinsics::sum(tr_cell) /
+                   yakl::intrinsics::sum(tr_exact_cell));
 }
 
 int main() {
