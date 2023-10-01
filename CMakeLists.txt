@@ -31,6 +31,7 @@ target_include_directories(omega PUBLIC
 target_link_libraries(omega netcdf)
 
 add_subdirectory(benchmark)
+add_subdirectory(experiment)
 
 enable_testing()
 add_subdirectory(test)

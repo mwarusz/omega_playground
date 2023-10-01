@@ -4,13 +4,9 @@
 
 using namespace omega;
 
-constexpr Real shrink_factor = 120;
+constexpr Real shrink_factor = 1;
 constexpr Real earth_radius = 6.37122e6 / shrink_factor;
 constexpr Real day = 24 * 60 * 60 / shrink_factor;
-
-bool check_rate(Real rate, Real expected_rate, Real atol) {
-  return std::abs(rate - expected_rate) < atol && !std::isnan(rate);
-}
 
 struct CosineBell {
   Real m_u0 = 2 * pi * earth_radius / (12 * day);
@@ -150,11 +146,6 @@ int main() {
       }
       std::cout << std::endl;
     }
-
-    // if (!check_rate(rate.back(), 2, 0.05)) {
-    //   throw std::runtime_error(
-    //       "Tracer advection is not converging at the right rate");
-    // }
   }
 
   yakl::finalize();
