@@ -50,7 +50,7 @@ if (netCDF_FOUND)
     endif ()
   endif ()
 
-  FindNetCDF_get_is_parallel_aware("${NetCDF_INCLUDE_DIRS}")
+  #FindNetCDF_get_is_parallel_aware("${NetCDF_INCLUDE_DIRS}")
   # Skip the rest of the logic in this file.
   return ()
 endif ()
@@ -81,7 +81,7 @@ if (PkgConfig_FOUND)
         INTERFACE_LINK_LIBRARIES "PkgConfig::_NetCDF")
     endif ()
 
-    FindNetCDF_get_is_parallel_aware("${_NetCDF_INCLUDEDIR}")
+    #FindNetCDF_get_is_parallel_aware("${_NetCDF_INCLUDEDIR}")
     # Skip the rest of the logic in this file.
     return ()
   endif ()
@@ -111,7 +111,7 @@ if (NetCDF_INCLUDE_DIR)
   unset(_netcdf_version_note)
   unset(_netcdf_version_lines)
 
-  FindNetCDF_get_is_parallel_aware("${NetCDF_INCLUDE_DIR}")
+  #FindNetCDF_get_is_parallel_aware("${NetCDF_INCLUDE_DIR}")
 endif ()
 
 include(FindPackageHandleStandardArgs)
