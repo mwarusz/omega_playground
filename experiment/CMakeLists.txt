@@ -5,3 +5,4 @@ macro(add_omega_experiment expname)
 endmacro(add_omega_experiment)
 
 add_omega_experiment(cosine_bell)
+add_omega_experiment(steady_zonal)
