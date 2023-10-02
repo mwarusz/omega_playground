@@ -172,7 +172,7 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
           Int jedge = edges_on_cell(icell, j);
           Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-          ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
+          ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) * 0.25_fp;
           div +=
               dv_edge(jedge) * edge_sign_on_cell(icell, j) * vn_edge(jedge, k);
 
@@ -181,16 +181,18 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
           // rvort +=
           //     kiteareas_on_vertex(jvertex, jkite) * rvort_vertex(jvertex, k);
         }
-        ke /= area_cell(icell);
-        div /= area_cell(icell);
+        Real inv_area_cell = 1._fp / area_cell(icell);
+        ke *= inv_area_cell;
+        div *= inv_area_cell;
         // rvort /= area_cell(icell);
 
         div_cell(icell, k) = div;
         ke_cell(icell, k) = ke;
         // rvort_cell(icell, k) = rvort;
 
+        Real inv_h = 1._fp / h_cell(icell, k);
         for (Int l = 0; l < ntracers; ++l) {
-          norm_tr_cell(l, icell, k) = tr_cell(l, icell, k) / h_cell(icell, k);
+          norm_tr_cell(l, icell, k) = tr_cell(l, icell, k) * inv_h;
         }
       });
 }
@@ -215,25 +217,27 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
       "compute_vertex_auxiliarys",
       SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int ivertex, Int k) {
+        Real inv_area_triangle = 1._fp / area_triangle(ivertex);
         Real rcirc = -0;
         for (Int j = 0; j < 3; ++j) {
           Int jedge = edges_on_vertex(ivertex, j);
           rcirc += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
                    vn_edge(jedge, k);
         }
-        Real rvort = rcirc / area_triangle(ivertex);
+        Real rvort = rcirc * inv_area_triangle;
 
         Real h = -0;
         for (Int j = 0; j < 3; ++j) {
           Int jcell = cells_on_vertex(ivertex, j);
           h += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
         }
-        h /= area_triangle(ivertex);
+        h *= inv_area_triangle;
+        Real inv_h = 1._fp / h;
 
         // rcirc_vertex(ivertex, k) = rcirc;
         rvort_vertex(ivertex, k) = rvort;
-        norm_rvort_vertex(ivertex, k) = rvort / h;
-        norm_f_vertex(ivertex, k) = f_vertex(ivertex) / h;
+        norm_rvort_vertex(ivertex, k) = rvort * inv_h;
+        norm_f_vertex(ivertex, k) = f_vertex(ivertex) * inv_h;
       });
 }
 
@@ -266,7 +270,7 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
           Int jcell = cells_on_edge(iedge, j);
           h_mean += h_cell(jcell, k);
         }
-        h_mean /= 2;
+        h_mean *= 0.5_fp;
 
         Real vt = -0;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
@@ -281,8 +285,8 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
           norm_rvort += norm_rvort_vertex(jvertex, k);
           norm_f += norm_f_vertex(jvertex, k);
         }
-        norm_rvort /= 2;
-        norm_f /= 2;
+        norm_rvort *= 0.5_fp;
+        norm_f *= 0.5_fp;
 
         h_mean_edge(iedge, k) = h_mean;
         h_flux_edge(iedge, k) = h_mean;
@@ -402,7 +406,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
             del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
                        del2u_edge(jedge, k);
           }
-          del2div /= area_cell(icell);
+          Real inv_area_cell = 1._fp / area_cell(icell);
+          del2div *= inv_area_cell;
           del2div_cell(icell, k) = del2div;
         });
 
@@ -416,7 +421,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
             del2rvort += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
                          vn_edge(jedge, k);
           }
-          del2rvort /= area_triangle(ivertex);
+          Real inv_area_triangle = 1._fp / area_triangle(ivertex);
+          del2rvort *= inv_area_triangle;
 
           del2rvort_vertex(ivertex, k) = del2rvort;
         });
@@ -432,8 +438,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Int jedge = edges_on_edge(iedge, j);
 
           Real norm_vort = (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
-                            norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) /
-                           2;
+                            norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
+                           0.5_fp;
 
           qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
                 vn_edge(jedge, k) * norm_vort;
@@ -445,26 +451,29 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         Real ke_cell0 = ke_cell(icell0, k);
         Real ke_cell1 = ke_cell(icell1, k);
 
+        Real inv_dc_edge = 1._fp / dc_edge(iedge);
         Real grad_B = (ke_cell1 - ke_cell0 +
-                       grav * (h_cell(icell1, k) - h_cell(icell0, k))) /
-                      dc_edge(iedge);
+                       grav * (h_cell(icell1, k) - h_cell(icell0, k))) *
+                      inv_dc_edge;
 
+        Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
         Real drag_force = (k == (max_level_edge_top(iedge) - 1))
                               ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
-                                    vn_edge(iedge, k) / h_drag_edge(iedge, k)
+                                    vn_edge(iedge, k) * inv_h_drag_edge
                               : 0;
 
         vn_tend = qt - grad_B + drag_force;
 
+        Real inv_dv_edge = 1._fp / dv_edge(iedge);
         // viscosity
         if (visc_del2 > 0) {
           Int ivertex0 = vertices_on_edge(iedge, 0);
           Int ivertex1 = vertices_on_edge(iedge, 1);
           Real visc2 =
               visc_del2 * mesh_scaling_del2(iedge) *
-              ((div_cell(icell1, k) - div_cell(icell0, k)) / dc_edge(iedge) -
-               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) /
-                   dv_edge(iedge));
+              ((div_cell(icell1, k) - div_cell(icell0, k)) * inv_dc_edge -
+               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
+                   inv_dv_edge);
           vn_tend += visc2 * edge_mask(iedge, k);
         }
 
@@ -474,10 +483,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Int ivertex1 = vertices_on_edge(iedge, 1);
           Real visc4 =
               visc_del4 * mesh_scaling_del4(iedge) *
-              ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) /
-                   dc_edge(iedge) -
-               (del2rvort_vertex(ivertex1, k) - del2rvort_vertex(ivertex0, k)) /
-                   dv_edge(iedge));
+              ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) *
+                   inv_dc_edge -
+               (del2rvort_vertex(ivertex1, k) - del2rvort_vertex(ivertex0, k)) *
+                   inv_dv_edge);
           vn_tend -= visc4 * edge_mask(iedge, k);
         }
 
@@ -526,15 +535,17 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
             Int jcell0 = cells_on_edge(jedge, 0);
             Int jcell1 = cells_on_edge(jedge, 1);
 
+            Real inv_dc_edge = 1._fp / dc_edge(jedge);
             Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) /
-                dc_edge(jedge);
+                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
+                inv_dc_edge;
 
             tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
                        h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
                        grad_tr_edge;
           }
-          tmp_tr_del2_cell(l, icell, k) = tr_del2 / area_cell(icell);
+          Real inv_area_cell = 1._fp / area_cell(icell);
+          tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
         });
   }
 
@@ -551,25 +562,27 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           Int jcell1 = cells_on_edge(jedge, 1);
 
           Real norm_tr_edge =
-              (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) / 2;
+              (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) *
+              0.5_fp;
 
           // advection
           Real tr_flux =
               -h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
 
+          Real inv_dc_edge = 1._fp / dc_edge(jedge);
           // diffusion
           if (eddy_diff2 > 0) {
             Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) /
-                dc_edge(jedge);
+                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
+                inv_dc_edge;
             tr_flux += eddy_diff2 * h_mean_edge(jedge, k) * grad_tr_edge;
           }
 
           // hyperdiffusion
           if (eddy_diff4 > 0) {
             Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
-                                      tmp_tr_del2_cell(l, jcell0, k)) /
-                                     dc_edge(jedge);
+                                      tmp_tr_del2_cell(l, jcell0, k)) *
+                                     inv_dc_edge;
             tr_flux -= eddy_diff4 * grad_tr_del2_edge;
           }
 
@@ -577,12 +590,13 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                      mesh_scaling_del4(jedge);
         }
 
+        Real inv_area_cell = 1._fp / area_cell(icell);
         if (add_mode == AddMode::increment) {
-          tr_tend_cell(l, icell, k) += tr_tend / area_cell(icell);
+          tr_tend_cell(l, icell, k) += tr_tend * inv_area_cell;
         }
 
         if (add_mode == AddMode::replace) {
-          tr_tend_cell(l, icell, k) = tr_tend / area_cell(icell);
+          tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
         }
       });
 }
