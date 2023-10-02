@@ -2,6 +2,10 @@
 
 namespace omega {
 
+using yakl::simd::iterate_over_pack;
+using yakl::simd::Pack;
+using yakl::simd::PackIterConfig;
+
 // Base
 
 ShallowWaterModelBase::ShallowWaterModelBase(MPASMesh *mesh,
@@ -164,35 +168,60 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
 
   parallel_for(
       "compute_cell_auxiliarys",
-      SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
-        Real ke = -0;
-        // Real rvort = -0;
-        Real div = -0;
+      SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers / vector_length),
+      YAKL_LAMBDA(Int icell, Int kv) {
+        Pack<Real, vector_length> ke_pack;
+        Pack<Real, vector_length> div_pack;
+        ke_pack = 0;
+        div_pack = 0;
+
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
           Int jedge = edges_on_cell(icell, j);
           Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-          ke += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) * 0.25_fp;
-          div +=
-              dv_edge(jedge) * edge_sign_on_cell(icell, j) * vn_edge(jedge, k);
 
-          // Int jvertex = vertices_on_cell(icell, j);
-          // Int jkite = kite_index_on_cell(icell, j);
-          // rvort +=
-          //     kiteareas_on_vertex(jvertex, jkite) * rvort_vertex(jvertex, k);
+          Pack<Real, vector_length> vn_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                vn_pack(klane) = vn_edge(jedge, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          ke_pack += area_edge * vn_pack * vn_pack * 0.25_fp;
+          div_pack += dv_edge(jedge) * edge_sign_on_cell(icell, j) * vn_pack;
         }
         Real inv_area_cell = 1._fp / area_cell(icell);
-        ke *= inv_area_cell;
-        div *= inv_area_cell;
-        // rvort /= area_cell(icell);
+        ke_pack *= inv_area_cell;
+        div_pack *= inv_area_cell;
 
-        div_cell(icell, k) = div;
-        ke_cell(icell, k) = ke;
-        // rvort_cell(icell, k) = rvort;
+        Pack<Real, vector_length> h_pack;
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              div_cell(icell, k) = div_pack(klane);
+              ke_cell(icell, k) = ke_pack(klane);
+              h_pack(klane) = h_cell(icell, k);
+            },
+            PackIterConfig<vector_length, true>());
 
-        Real inv_h = 1._fp / h_cell(icell, k);
+        auto inv_h_pack = 1._fp / h_pack;
         for (Int l = 0; l < ntracers; ++l) {
-          norm_tr_cell(l, icell, k) = tr_cell(l, icell, k) * inv_h;
+          Pack<Real, vector_length> norm_tr_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                norm_tr_pack(klane) = tr_cell(l, icell, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          norm_tr_pack *= inv_h_pack;
+
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                norm_tr_cell(l, icell, k) = norm_tr_pack(klane);
+              },
+              PackIterConfig<vector_length, true>());
         }
       });
 }
@@ -215,29 +244,56 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
 
   parallel_for(
       "compute_vertex_auxiliarys",
-      SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int ivertex, Int k) {
+      SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers / vector_length),
+      YAKL_LAMBDA(Int ivertex, Int kv) {
         Real inv_area_triangle = 1._fp / area_triangle(ivertex);
-        Real rcirc = -0;
+        Pack<Real, vector_length> rvort_pack;
+        rvort_pack = 0;
         for (Int j = 0; j < 3; ++j) {
           Int jedge = edges_on_vertex(ivertex, j);
-          rcirc += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
-                   vn_edge(jedge, k);
-        }
-        Real rvort = rcirc * inv_area_triangle;
 
-        Real h = -0;
+          Pack<Real, vector_length> vn_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                vn_pack(klane) = vn_edge(jedge, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          rvort_pack +=
+              dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) * vn_pack;
+        }
+        rvort_pack *= inv_area_triangle;
+
+        Pack<Real, vector_length> h_vertex_pack;
+        h_vertex_pack = 0;
         for (Int j = 0; j < 3; ++j) {
           Int jcell = cells_on_vertex(ivertex, j);
-          h += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
-        }
-        h *= inv_area_triangle;
-        Real inv_h = 1._fp / h;
 
-        // rcirc_vertex(ivertex, k) = rcirc;
-        rvort_vertex(ivertex, k) = rvort;
-        norm_rvort_vertex(ivertex, k) = rvort * inv_h;
-        norm_f_vertex(ivertex, k) = f_vertex(ivertex) * inv_h;
+          Pack<Real, vector_length> h_cell_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                h_cell_pack(klane) = h_cell(jcell, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          h_vertex_pack += kiteareas_on_vertex(ivertex, j) * h_cell_pack;
+        }
+        h_vertex_pack *= inv_area_triangle;
+
+        auto inv_h_vertex_pack = 1._fp / h_vertex_pack;
+        auto norm_rvort_pack = inv_h_vertex_pack * rvort_pack;
+        auto norm_f_pack = inv_h_vertex_pack * f_vertex(ivertex);
+
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              rvort_vertex(ivertex, k) = rvort_pack(klane);
+              norm_rvort_vertex(ivertex, k) = norm_rvort_pack(klane);
+              norm_f_vertex(ivertex, k) = norm_f_pack(klane);
+            },
+            PackIterConfig<vector_length, true>());
       });
 }
 
@@ -263,39 +319,76 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
 
   parallel_for(
       "compute_edge_auxiliarys",
-      SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
-        Real h_mean = -0;
+      SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers / vector_length),
+      YAKL_LAMBDA(Int iedge, Int kv) {
+        Pack<Real, vector_length> h_mean_pack;
+        h_mean_pack = 0;
         for (Int j = 0; j < 2; ++j) {
           Int jcell = cells_on_edge(iedge, j);
-          h_mean += h_cell(jcell, k);
-        }
-        h_mean *= 0.5_fp;
 
-        Real vt = -0;
+          Pack<Real, vector_length> h_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                h_pack(klane) = h_cell(jcell, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          h_mean_pack += h_pack;
+        }
+        h_mean_pack *= 0.5_fp;
+
+        Pack<Real, vector_length> vt_pack;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
           Int jedge = edges_on_edge(iedge, j);
-          vt += weights_on_edge(iedge, j) * vn_edge(jedge, k);
+
+          Pack<Real, vector_length> vn_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                vn_pack(klane) = vn_edge(jedge, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          vt_pack += weights_on_edge(iedge, j) * vn_pack;
         }
 
-        Real norm_f = -0;
-        Real norm_rvort = -0;
+        Pack<Real, vector_length> norm_f_edge_pack;
+        Pack<Real, vector_length> norm_rvort_edge_pack;
+        norm_f_edge_pack = 0;
+        norm_rvort_edge_pack = 0;
         for (Int j = 0; j < 2; ++j) {
           Int jvertex = vertices_on_edge(iedge, j);
-          norm_rvort += norm_rvort_vertex(jvertex, k);
-          norm_f += norm_f_vertex(jvertex, k);
+
+          Pack<Real, vector_length> norm_f_vertex_pack;
+          Pack<Real, vector_length> norm_rvort_vertex_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                norm_f_vertex_pack(klane) = norm_rvort_vertex(jvertex, k);
+                norm_rvort_vertex_pack(klane) = norm_f_vertex(jvertex, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          norm_rvort_edge_pack += norm_rvort_vertex_pack;
+          norm_f_edge_pack += norm_f_vertex_pack;
         }
-        norm_rvort *= 0.5_fp;
-        norm_f *= 0.5_fp;
+        norm_rvort_edge_pack *= 0.5_fp;
+        norm_f_edge_pack *= 0.5_fp;
 
-        h_mean_edge(iedge, k) = h_mean;
-        h_flux_edge(iedge, k) = h_mean;
-        h_drag_edge(iedge, k) = h_mean;
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              h_mean_edge(iedge, k) = h_mean_pack(klane);
+              h_flux_edge(iedge, k) = h_mean_pack(klane);
+              h_drag_edge(iedge, k) = h_mean_pack(klane);
 
-        vt_edge(iedge, k) = vt;
+              vt_edge(iedge, k) = vt_pack(klane);
 
-        norm_rvort_edge(iedge, k) = norm_rvort;
-        norm_f_edge(iedge, k) = norm_f;
+              norm_rvort_edge(iedge, k) = norm_rvort_edge_pack(klane);
+              norm_f_edge(iedge, k) = norm_f_edge_pack(klane);
+            },
+            PackIterConfig<vector_length, true>());
       });
 }
 
@@ -312,22 +405,41 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
 
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
   parallel_for(
-      "compute_htend", SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
-        Real accum = -0;
+      "compute_htend",
+      SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers / vector_length),
+      YAKL_LAMBDA(Int icell, Int kv) {
+        Pack<Real, vector_length> h_tend_cell_pack;
+        h_tend_cell_pack = 0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
           Int jedge = edges_on_cell(icell, j);
-          accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                   h_flux_edge(jedge, k) * vn_edge(jedge, k);
+
+          Pack<Real, vector_length> h_flux_edge_pack, vn_edge_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                h_flux_edge_pack(klane) = h_flux_edge(jedge, k);
+                vn_edge_pack(klane) = vn_edge(jedge, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          h_tend_cell_pack += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                              h_flux_edge_pack * vn_edge_pack;
         }
 
-        if (add_mode == AddMode::increment) {
-          h_tend_cell(icell, k) += -accum / area_cell(icell);
-        }
+        Real inv_area_cell = 1._fp / area_cell(icell);
+        h_tend_cell_pack *= -inv_area_cell;
 
-        if (add_mode == AddMode::replace) {
-          h_tend_cell(icell, k) = -accum / area_cell(icell);
-        }
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              if (add_mode == AddMode::increment) {
+                h_tend_cell(icell, k) += h_tend_cell_pack(klane);
+              }
+              if (add_mode == AddMode::replace) {
+                h_tend_cell(icell, k) = h_tend_cell_pack(klane);
+              }
+            },
+            PackIterConfig<vector_length, true>());
       });
 }
 
@@ -376,8 +488,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
     parallel_for(
         "compute_del2u_edge",
-        SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int iedge, Int k) {
+        SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers / vector_length),
+        YAKL_LAMBDA(Int iedge, Int kv) {
           Int icell0 = cells_on_edge(iedge, 0);
           Int icell1 = cells_on_edge(iedge, 1);
 
@@ -388,114 +500,227 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Real dv_edge_inv =
               1._fp / std::max(dv_edge(iedge), 0.25_fp * dc_edge(iedge)); // huh
 
-          Real del2u =
-              ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
-               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
-                   dv_edge_inv);
+          Pack<Real, vector_length> div0_pack;
+          Pack<Real, vector_length> div1_pack;
+          Pack<Real, vector_length> rvort0_pack;
+          Pack<Real, vector_length> rvort1_pack;
 
-          del2u_edge(iedge, k) = del2u;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                div0_pack(klane) = div_cell(icell0, k);
+                div1_pack(klane) = div_cell(icell1, k);
+                rvort0_pack(klane) = rvort_vertex(ivertex0, k);
+                rvort1_pack(klane) = rvort_vertex(ivertex1, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          Pack<Real, vector_length> del2u_pack;
+          del2u_pack = (div1_pack - div0_pack) * dc_edge_inv -
+                       (rvort1_pack - rvort0_pack) * dv_edge_inv;
+
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                del2u_edge(iedge, k) = del2u_pack(klane);
+              },
+              PackIterConfig<vector_length, true>());
         });
 
     parallel_for(
         "compute_del2div_cell",
-        SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int icell, Int k) {
-          Real del2div = -0;
+        SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers / vector_length),
+        YAKL_LAMBDA(Int icell, Int kv) {
+          Pack<Real, vector_length> del2div_pack;
+          del2div_pack = 0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
-            del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       del2u_edge(jedge, k);
+
+            Pack<Real, vector_length> del2u_pack;
+            iterate_over_pack(
+                [&](Int klane) {
+                  Int k = kv * vector_length + klane;
+                  del2u_pack(klane) = del2u_edge(jedge, k);
+                },
+                PackIterConfig<vector_length, true>());
+
+            del2div_pack +=
+                dv_edge(jedge) * edge_sign_on_cell(icell, j) * del2u_pack;
           }
           Real inv_area_cell = 1._fp / area_cell(icell);
-          del2div *= inv_area_cell;
-          del2div_cell(icell, k) = del2div;
+          del2div_pack *= inv_area_cell;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                del2div_cell(icell, k) = del2div_pack(klane);
+              },
+              PackIterConfig<vector_length, true>());
         });
 
     parallel_for(
         "compute_del2rvort_vertex",
-        SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int ivertex, Int k) {
-          Real del2rvort = -0;
+        SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers / vector_length),
+        YAKL_LAMBDA(Int ivertex, Int kv) {
+          Pack<Real, vector_length> del2rvort_pack;
+          del2rvort_pack = 0;
           for (Int j = 0; j < 3; ++j) {
             Int jedge = edges_on_vertex(ivertex, j);
-            del2rvort += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
-                         vn_edge(jedge, k);
+
+            Pack<Real, vector_length> vn_pack;
+            iterate_over_pack(
+                [&](Int klane) {
+                  Int k = kv * vector_length + klane;
+                  vn_pack(klane) = vn_edge(jedge, k);
+                },
+                PackIterConfig<vector_length, true>());
+
+            del2rvort_pack +=
+                dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) * vn_pack;
           }
           Real inv_area_triangle = 1._fp / area_triangle(ivertex);
-          del2rvort *= inv_area_triangle;
+          del2rvort_pack *= inv_area_triangle;
 
-          del2rvort_vertex(ivertex, k) = del2rvort;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                del2rvort_vertex(ivertex, k) = del2rvort_pack(klane);
+              },
+              PackIterConfig<vector_length, true>());
         });
   }
 
   parallel_for(
-      "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
-        Real vn_tend = -0;
+      "compute_vtend",
+      SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers / vector_length),
+      YAKL_LAMBDA(Int iedge, Int kv) {
+        Pack<Real, vector_length> vn_tend_pack;
+        vn_tend_pack = 0;
 
-        Real qt = -0;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
           Int jedge = edges_on_edge(iedge, j);
 
-          Real norm_vort = (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
-                            norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
-                           0.5_fp;
+          Pack<Real, vector_length> norm_rvort_iedge_pack;
+          Pack<Real, vector_length> norm_f_iedge_pack;
+          Pack<Real, vector_length> norm_rvort_jedge_pack;
+          Pack<Real, vector_length> norm_f_jedge_pack;
+          Pack<Real, vector_length> norm_rvort_pack;
+          Pack<Real, vector_length> h_flux_pack;
+          Pack<Real, vector_length> vn_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                h_flux_pack(klane) = h_flux_edge(jedge, k);
+                vn_pack(klane) = vn_edge(jedge, k);
+                norm_rvort_iedge_pack(klane) = norm_rvort_edge(iedge, k);
+                norm_f_iedge_pack(klane) = norm_f_edge(iedge, k);
+                norm_rvort_jedge_pack(klane) = norm_rvort_edge(jedge, k);
+                norm_f_jedge_pack(klane) = norm_f_edge(jedge, k);
+              },
+              PackIterConfig<vector_length, true>());
 
-          qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
-                vn_edge(jedge, k) * norm_vort;
+          norm_rvort_pack = (norm_rvort_iedge_pack + norm_f_iedge_pack +
+                             norm_rvort_jedge_pack + norm_f_jedge_pack) *
+                            0.5_fp;
+
+          vn_tend_pack += weights_on_edge(iedge, j) * h_flux_pack * vn_pack *
+                          norm_rvort_pack;
         }
 
         Int icell0 = cells_on_edge(iedge, 0);
         Int icell1 = cells_on_edge(iedge, 1);
 
-        Real ke_cell0 = ke_cell(icell0, k);
-        Real ke_cell1 = ke_cell(icell1, k);
+        Pack<Real, vector_length> ke0_pack;
+        Pack<Real, vector_length> ke1_pack;
+        Pack<Real, vector_length> h0_pack;
+        Pack<Real, vector_length> h1_pack;
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              h0_pack(klane) = h_cell(icell0, k);
+              ke0_pack(klane) = ke_cell(icell0, k);
+              h1_pack(klane) = h_cell(icell1, k);
+              ke1_pack(klane) = ke_cell(icell1, k);
+            },
+            PackIterConfig<vector_length, true>());
 
         Real inv_dc_edge = 1._fp / dc_edge(iedge);
-        Real grad_B = (ke_cell1 - ke_cell0 +
-                       grav * (h_cell(icell1, k) - h_cell(icell0, k))) *
-                      inv_dc_edge;
+        vn_tend_pack -=
+            (ke1_pack - ke0_pack + grav * (h1_pack - h0_pack)) * inv_dc_edge;
 
-        Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
-        Real drag_force = (k == (max_level_edge_top(iedge) - 1))
-                              ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
-                                    vn_edge(iedge, k) * inv_h_drag_edge
-                              : 0;
-
-        vn_tend = qt - grad_B + drag_force;
+        // TODO: vectorize this
+        // Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
+        // Real drag_force = (k == (max_level_edge_top(iedge) - 1))
+        //                      ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
+        //                            vn_edge(iedge, k) * inv_h_drag_edge
+        //                      : 0;
 
         Real inv_dv_edge = 1._fp / dv_edge(iedge);
         // viscosity
         if (visc_del2 > 0) {
           Int ivertex0 = vertices_on_edge(iedge, 0);
           Int ivertex1 = vertices_on_edge(iedge, 1);
-          Real visc2 =
-              visc_del2 * mesh_scaling_del2(iedge) *
-              ((div_cell(icell1, k) - div_cell(icell0, k)) * inv_dc_edge -
-               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
-                   inv_dv_edge);
-          vn_tend += visc2 * edge_mask(iedge, k);
+
+          Pack<Real, vector_length> div0_pack;
+          Pack<Real, vector_length> div1_pack;
+          Pack<Real, vector_length> rvort0_pack;
+          Pack<Real, vector_length> rvort1_pack;
+          Pack<Real, vector_length> edge_mask_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                div0_pack(klane) = div_cell(icell0, k);
+                rvort0_pack(klane) = rvort_vertex(ivertex0, k);
+                div1_pack(klane) = div_cell(icell1, k);
+                rvort1_pack(klane) = rvort_vertex(ivertex1, k);
+                edge_mask_pack(klane) = rvort_vertex(iedge, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          vn_tend_pack += visc_del2 * mesh_scaling_del2(iedge) *
+                          edge_mask_pack *
+                          ((div1_pack - div0_pack) * inv_dc_edge -
+                           (rvort1_pack - rvort0_pack) * inv_dv_edge);
         }
 
         // hyperviscosity
         if (visc_del4 > 0) {
           Int ivertex0 = vertices_on_edge(iedge, 0);
           Int ivertex1 = vertices_on_edge(iedge, 1);
-          Real visc4 =
-              visc_del4 * mesh_scaling_del4(iedge) *
-              ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) *
-                   inv_dc_edge -
-               (del2rvort_vertex(ivertex1, k) - del2rvort_vertex(ivertex0, k)) *
-                   inv_dv_edge);
-          vn_tend -= visc4 * edge_mask(iedge, k);
+
+          Pack<Real, vector_length> del2div0_pack;
+          Pack<Real, vector_length> del2div1_pack;
+          Pack<Real, vector_length> del2rvort0_pack;
+          Pack<Real, vector_length> del2rvort1_pack;
+          Pack<Real, vector_length> edge_mask_pack;
+
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                del2div0_pack(klane) = del2div_cell(icell0, k);
+                del2rvort0_pack(klane) = del2rvort_vertex(ivertex0, k);
+                del2div1_pack(klane) = del2div_cell(icell1, k);
+                del2rvort1_pack(klane) = del2rvort_vertex(ivertex1, k);
+                edge_mask_pack(klane) = rvort_vertex(iedge, k);
+              },
+              PackIterConfig<vector_length, true>());
+
+          vn_tend_pack -= visc_del4 * mesh_scaling_del4(iedge) *
+                          edge_mask_pack *
+                          ((del2div1_pack - del2div0_pack) * inv_dc_edge -
+                           (del2rvort1_pack - del2rvort0_pack) * inv_dv_edge);
         }
 
-        if (add_mode == AddMode::increment) {
-          vn_tend_edge(iedge, k) += vn_tend;
-        }
-        if (add_mode == AddMode::replace) {
-          vn_tend_edge(iedge, k) = vn_tend;
-        }
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              if (add_mode == AddMode::increment) {
+                vn_tend_edge(iedge, k) += vn_tend_pack(klane);
+              }
+              if (add_mode == AddMode::replace) {
+                vn_tend_edge(iedge, k) = vn_tend_pack(klane);
+              }
+            },
+            PackIterConfig<vector_length, true>());
       });
 }
 
@@ -526,34 +751,53 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                               m_mesh->m_nlayers);
     parallel_for(
         "compute_tmp_tr_del2_cell",
-        SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          Real tr_del2 = -0;
+        SimpleBounds<3>(ntracers, m_mesh->m_ncells,
+                        m_mesh->m_nlayers / vector_length),
+        YAKL_LAMBDA(Int l, Int icell, Int kv) {
+          Pack<Real, vector_length> tr_del2_pack;
+          tr_del2_pack = 0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
             Int jedge = edges_on_cell(icell, j);
-
             Int jcell0 = cells_on_edge(jedge, 0);
             Int jcell1 = cells_on_edge(jedge, 1);
 
             Real inv_dc_edge = 1._fp / dc_edge(jedge);
-            Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
-                inv_dc_edge;
 
-            tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
-                       grad_tr_edge;
+            Pack<Real, vector_length> norm_tr0_pack;
+            Pack<Real, vector_length> norm_tr1_pack;
+            Pack<Real, vector_length> h_mean_pack;
+            iterate_over_pack(
+                [&](Int klane) {
+                  Int k = kv * vector_length + klane;
+                  norm_tr0_pack(klane) = norm_tr_cell(l, jcell0, k);
+                  norm_tr1_pack(klane) = norm_tr_cell(l, jcell1, k);
+                  h_mean_pack(klane) = h_mean_edge(jedge, k);
+                },
+                PackIterConfig<vector_length, true>());
+
+            tr_del2_pack += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                            mesh_scaling_del2(jedge) * inv_dc_edge *
+                            h_mean_pack * (norm_tr1_pack - norm_tr0_pack);
           }
           Real inv_area_cell = 1._fp / area_cell(icell);
-          tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
+          tr_del2_pack *= inv_area_cell;
+
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                tmp_tr_del2_cell(l, icell, k) = tr_del2_pack(klane);
+              },
+              PackIterConfig<vector_length, true>());
         });
   }
 
   parallel_for(
       "compute_tr_tend",
-      SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int l, Int icell, Int k) {
-        Real tr_tend = -0;
+      SimpleBounds<3>(ntracers, m_mesh->m_ncells,
+                      m_mesh->m_nlayers / vector_length),
+      YAKL_LAMBDA(Int l, Int icell, Int kv) {
+        Pack<Real, vector_length> tr_tend_pack;
+        tr_tend_pack = 0;
 
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
           Int jedge = edges_on_cell(icell, j);
@@ -561,43 +805,72 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           Int jcell0 = cells_on_edge(jedge, 0);
           Int jcell1 = cells_on_edge(jedge, 1);
 
-          Real norm_tr_edge =
-              (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) *
-              0.5_fp;
+          Pack<Real, vector_length> norm_tr0_pack;
+          Pack<Real, vector_length> norm_tr1_pack;
+          Pack<Real, vector_length> h_flux_pack;
+          Pack<Real, vector_length> vn_pack;
+          iterate_over_pack(
+              [&](Int klane) {
+                Int k = kv * vector_length + klane;
+                norm_tr0_pack(klane) = norm_tr_cell(l, jcell0, k);
+                norm_tr1_pack(klane) = norm_tr_cell(l, jcell1, k);
+                h_flux_pack(klane) = h_flux_edge(jedge, k);
+                vn_pack(klane) = vn_edge(jedge, k);
+              },
+              PackIterConfig<vector_length, true>());
 
+          Pack<Real, vector_length> tr_flux_pack;
           // advection
-          Real tr_flux =
-              -h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
+          tr_flux_pack =
+              -h_flux_pack * 0.5_fp * (norm_tr0_pack + norm_tr1_pack) * vn_pack;
 
           Real inv_dc_edge = 1._fp / dc_edge(jedge);
           // diffusion
           if (eddy_diff2 > 0) {
-            Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
-                inv_dc_edge;
-            tr_flux += eddy_diff2 * h_mean_edge(jedge, k) * grad_tr_edge;
+            Pack<Real, vector_length> h_mean_pack;
+            iterate_over_pack(
+                [&](Int klane) {
+                  Int k = kv * vector_length + klane;
+                  h_mean_pack(klane) = h_mean_edge(jedge, k);
+                },
+                PackIterConfig<vector_length, true>());
+            tr_flux_pack += eddy_diff2 * h_mean_pack * inv_dc_edge *
+                            (norm_tr1_pack - norm_tr0_pack);
           }
 
           // hyperdiffusion
           if (eddy_diff4 > 0) {
-            Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
-                                      tmp_tr_del2_cell(l, jcell0, k)) *
-                                     inv_dc_edge;
-            tr_flux -= eddy_diff4 * grad_tr_del2_edge;
+            Pack<Real, vector_length> tr0_del2_pack;
+            Pack<Real, vector_length> tr1_del2_pack;
+            iterate_over_pack(
+                [&](Int klane) {
+                  Int k = kv * vector_length + klane;
+                  tr0_del2_pack(klane) = tmp_tr_del2_cell(l, jcell0, k);
+                  tr1_del2_pack(klane) = tmp_tr_del2_cell(l, jcell1, k);
+                },
+                PackIterConfig<vector_length, true>());
+            tr_flux_pack -=
+                eddy_diff4 * inv_dc_edge * (tr1_del2_pack - tr0_del2_pack);
           }
 
-          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux *
-                     mesh_scaling_del4(jedge);
+          tr_tend_pack += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                          tr_flux_pack * mesh_scaling_del4(jedge);
         }
 
         Real inv_area_cell = 1._fp / area_cell(icell);
-        if (add_mode == AddMode::increment) {
-          tr_tend_cell(l, icell, k) += tr_tend * inv_area_cell;
-        }
+        tr_tend_pack *= inv_area_cell;
 
-        if (add_mode == AddMode::replace) {
-          tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
-        }
+        iterate_over_pack(
+            [&](Int klane) {
+              Int k = kv * vector_length + klane;
+              if (add_mode == AddMode::increment) {
+                tr_tend_cell(l, icell, k) += tr_tend_pack(klane);
+              }
+              if (add_mode == AddMode::replace) {
+                tr_tend_cell(l, icell, k) = tr_tend_pack(klane);
+              }
+            },
+            PackIterConfig<vector_length, true>());
       });
 }
 
