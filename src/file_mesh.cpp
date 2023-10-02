@@ -3,6 +3,36 @@
 
 namespace omega {
 
+void FileMesh::convert_fortran_indices_to_cxx() const {
+  parallel_for(
+      "fix_cell_indices", m_ncells, YAKL_CLASS_LAMBDA(Int icell) {
+        for (Int j = 0; j < maxedges; ++j) {
+          m_edges_on_cell(icell, j) -= 1;
+          m_cells_on_cell(icell, j) -= 1;
+          m_vertices_on_cell(icell, j) -= 1;
+        }
+      });
+
+  parallel_for(
+      "fix_edge_indices", m_nedges, YAKL_CLASS_LAMBDA(Int iedge) {
+        for (Int j = 0; j < 2 * maxedges; ++j) {
+          m_edges_on_edge(iedge, j) -= 1;
+        }
+        for (Int j = 0; j < 2; ++j) {
+          m_cells_on_edge(iedge, j) -= 1;
+          m_vertices_on_edge(iedge, j) -= 1;
+        }
+      });
+
+  parallel_for(
+      "fix_vertex_indices", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {
+        for (Int j = 0; j < 3; ++j) {
+          m_edges_on_vertex(ivertex, j) -= 1;
+          m_cells_on_vertex(ivertex, j) -= 1;
+        }
+      });
+}
+
 FileMesh::FileMesh(const std::string &filename, Int nlayers) {
   m_nlayers = nlayers;
 
@@ -24,14 +54,6 @@ FileMesh::FileMesh(const std::string &filename, Int nlayers) {
   nc.read(m_mesh_density, "meshDensity");
 
   m_ncells = m_area_cell.dimension[0];
-  parallel_for(
-      "fix_cell_indices", m_ncells, YAKL_CLASS_LAMBDA(Int icell) {
-        for (Int j = 0; j < maxedges; ++j) {
-          m_edges_on_cell(icell, j) -= 1;
-          m_cells_on_cell(icell, j) -= 1;
-          m_vertices_on_cell(icell, j) -= 1;
-        }
-      });
 
   nc.read(m_nedges_on_edge, "nEdgesOnEdge");
   nc.read(m_edges_on_edge, "edgesOnEdge");
@@ -49,16 +71,6 @@ FileMesh::FileMesh(const std::string &filename, Int nlayers) {
   nc.read(m_weights_on_edge, "weightsOnEdge");
 
   m_nedges = m_dc_edge.dimension[0];
-  parallel_for(
-      "fix_edge_indices", m_nedges, YAKL_CLASS_LAMBDA(Int iedge) {
-        for (Int j = 0; j < 2 * maxedges; ++j) {
-          m_edges_on_edge(iedge, j) -= 1;
-        }
-        for (Int j = 0; j < 2; ++j) {
-          m_cells_on_edge(iedge, j) -= 1;
-          m_vertices_on_edge(iedge, j) -= 1;
-        }
-      });
 
   nc.read(m_edges_on_vertex, "edgesOnVertex");
   nc.read(m_cells_on_vertex, "cellsOnVertex");
@@ -72,14 +84,8 @@ FileMesh::FileMesh(const std::string &filename, Int nlayers) {
   nc.read(m_kiteareas_on_vertex, "kiteAreasOnVertex");
 
   m_nvertices = m_area_triangle.dimension[0];
-  parallel_for(
-      "fix_vertex_indices", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {
-        for (Int j = 0; j < 3; ++j) {
-          m_edges_on_vertex(ivertex, j) -= 1;
-          m_cells_on_vertex(ivertex, j) -= 1;
-        }
-      });
 
+  convert_fortran_indices_to_cxx();
   finalize_mesh();
 }
 

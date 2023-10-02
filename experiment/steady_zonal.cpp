@@ -14,18 +14,20 @@ struct SteadyZonal {
   Real m_u0 = 2 * pi * earth_radius / (12 * day);
   Real m_alpha = pi / 4;
   Real m_h0 = 2.94e4 / grav;
-  
+
   YAKL_INLINE Real coriolis(Real lon, Real lat) const {
     using std::cos;
     using std::sin;
-    return 2 * omg * (-cos(lon) * cos(lat) * sin(m_alpha) + sin(lat) * cos(m_alpha));
+    return 2 * omg *
+           (-cos(lon) * cos(lat) * sin(m_alpha) + sin(lat) * cos(m_alpha));
   }
 
   YAKL_INLINE Real h(Real lon, Real lat) const {
     using std::cos;
     using std::sin;
     Real tmp = -cos(lat) * cos(lon) * sin(m_alpha) + sin(lat) * cos(m_alpha);
-    return m_h0 - (earth_radius * omg * m_u0 + m_u0 * m_u0 / 2) * tmp * tmp / grav;
+    return m_h0 -
+           (earth_radius * omg * m_u0 + m_u0 * m_u0 / 2) * tmp * tmp / grav;
   }
 
   YAKL_INLINE Real psi(Real lon, Real lat) const {
@@ -60,7 +62,8 @@ Real run(Int l) {
   Real timeend = day;
   Real cfl = 0.6;
   Real min_dc_edge = yakl::intrinsics::minval(mesh->m_dc_edge);
-  Real dt = cfl * min_dc_edge / (steady_zonal.m_u0 + std::sqrt(grav * steady_zonal.m_h0));
+  Real dt = cfl * min_dc_edge /
+            (steady_zonal.m_u0 + std::sqrt(grav * steady_zonal.m_h0));
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -111,8 +114,8 @@ Real run(Int l) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
-  std::cout << "h extrema: " << yakl::intrinsics::minval(h_cell)
-            << " " << yakl::intrinsics::maxval(h_cell) << std::endl;
+  std::cout << "h extrema: " << yakl::intrinsics::minval(h_cell) << " "
+            << yakl::intrinsics::maxval(h_cell) << std::endl;
 
   YAKL_SCOPE(area_cell, mesh->m_area_cell);
   parallel_for(
@@ -120,8 +123,7 @@ Real run(Int l) {
       YAKL_LAMBDA(Int icell, Int k) {
         h_cell(icell, k) -= h_exact_cell(icell, k);
         h_cell(icell, k) *= area_cell(icell) * h_cell(icell, k);
-        h_exact_cell(icell, k) *=
-            area_cell(icell) * h_exact_cell(icell, k);
+        h_exact_cell(icell, k) *= area_cell(icell) * h_exact_cell(icell, k);
       });
 
   return std::sqrt(yakl::intrinsics::sum(h_cell) /
