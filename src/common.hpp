@@ -10,6 +10,8 @@ using Int = int;
 
 YAKL_INLINE constexpr Real operator""_fp(long double x) { return x; }
 
+constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
+
 constexpr Real pi = M_PI;
 
 using yakl::SArray;

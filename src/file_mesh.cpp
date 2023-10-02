@@ -34,7 +34,7 @@ void FileMesh::convert_fortran_indices_to_cxx() const {
 }
 
 FileMesh::FileMesh(const std::string &filename, Int nlayers) {
-  m_nlayers = nlayers;
+  m_nlayers = std::ceil(Real(nlayers) / vector_length) * vector_length;
 
   yakl::SimpleNetCDF nc;
 
