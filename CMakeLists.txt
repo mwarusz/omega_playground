@@ -23,19 +23,28 @@ find_package(NetCDF REQUIRED)
 
 FetchContent_MakeAvailable(yakl)
 
-add_library(omega
+set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "omega vector length")
+
+set(OMEGA_SOURCES
   src/mpas_mesh.cpp
   src/planar_hexagonal_mesh.cpp
   src/file_mesh.cpp
-  src/shallow_water.cpp
   src/lsrk.cpp
   src/rk4.cpp
 )
+if (${OMEGA_VECTOR_LENGTH} EQUAL 1)
+  list(APPEND OMEGA_SOURCES src/shallow_water.cpp)
+else()
+  list(APPEND OMEGA_SOURCES src/shallow_water_vectorized.cpp)
+endif()
+
+add_library(omega ${OMEGA_SOURCES})
 yakl_process_target(omega)
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_link_libraries(omega NetCDF::NetCDF ${OMEGA_LINK_FLAGS})
+target_compile_definitions(omega PUBLIC OMEGA_VECTOR_LENGTH=${OMEGA_VECTOR_LENGTH})
 
 add_subdirectory(benchmark)
 add_subdirectory(experiment)
