@@ -583,11 +583,11 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
             Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
                                       tmp_tr_del2_cell(l, jcell0, k)) *
                                      inv_dc_edge;
-            tr_flux -= eddy_diff4 * grad_tr_del2_edge;
+            tr_flux -=
+                eddy_diff4 * grad_tr_del2_edge * mesh_scaling_del4(jedge);
           }
 
-          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux *
-                     mesh_scaling_del4(jedge);
+          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
         }
 
         Real inv_area_cell = 1._fp / area_cell(icell);
