@@ -672,7 +672,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                 rvort0_pack(klane) = rvort_vertex(ivertex0, k);
                 div1_pack(klane) = div_cell(icell1, k);
                 rvort1_pack(klane) = rvort_vertex(ivertex1, k);
-                edge_mask_pack(klane) = rvort_vertex(iedge, k);
+                edge_mask_pack(klane) = edge_mask(iedge, k);
               },
               PackIterConfig<vector_length, true>());
 
@@ -700,7 +700,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                 del2rvort0_pack(klane) = del2rvort_vertex(ivertex0, k);
                 del2div1_pack(klane) = del2div_cell(icell1, k);
                 del2rvort1_pack(klane) = del2rvort_vertex(ivertex1, k);
-                edge_mask_pack(klane) = rvort_vertex(iedge, k);
+                edge_mask_pack(klane) = edge_mask(iedge, k);
               },
               PackIterConfig<vector_length, true>());
 
