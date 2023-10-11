@@ -849,12 +849,13 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                   tr1_del2_pack(klane) = tmp_tr_del2_cell(l, jcell1, k);
                 },
                 PackIterConfig<vector_length, true>());
-            tr_flux_pack -=
-                eddy_diff4 * inv_dc_edge * (tr1_del2_pack - tr0_del2_pack);
+            tr_flux_pack -= eddy_diff4 * inv_dc_edge *
+                            mesh_scaling_del4(jedge) *
+                            (tr1_del2_pack - tr0_del2_pack);
           }
 
-          tr_tend_pack += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                          tr_flux_pack * mesh_scaling_del4(jedge);
+          tr_tend_pack +=
+              dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux_pack;
         }
 
         Real inv_area_cell = 1._fp / area_cell(icell);
