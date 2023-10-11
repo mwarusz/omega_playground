@@ -17,7 +17,6 @@ struct MPASMesh {
   Int2d m_cells_on_cell;
   Int2d m_vertices_on_cell;
 
-  Int2d m_edge_sign_on_cell;
   Int2d m_kite_index_on_cell;
   Int1d m_max_level_cell;
 
@@ -28,6 +27,7 @@ struct MPASMesh {
   Real1d m_y_cell;
   Real1d m_z_cell;
   Real1d m_mesh_density;
+  Real2d m_edge_sign_on_cell;
 
   Int1d m_nedges_on_edge;
   Int2d m_edges_on_edge;
@@ -54,7 +54,6 @@ struct MPASMesh {
   Int2d m_edges_on_vertex;
   Int2d m_cells_on_vertex;
 
-  Int2d m_edge_sign_on_vertex;
   Int1d m_max_level_vertex_bot;
   Int1d m_max_level_vertex_top;
 
@@ -65,6 +64,7 @@ struct MPASMesh {
   Real1d m_y_vertex;
   Real1d m_z_vertex;
   Real2d m_kiteareas_on_vertex;
+  Real2d m_edge_sign_on_vertex;
 
   void finalize_mesh();
 };

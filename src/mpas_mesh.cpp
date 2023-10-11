@@ -5,7 +5,7 @@ namespace omega {
 void MPASMesh::finalize_mesh() {
 
   m_max_level_cell = Int1d("max_level_cell", m_ncells);
-  m_edge_sign_on_cell = Int2d("edge_sign_on_cell", m_ncells, maxedges);
+  m_edge_sign_on_cell = Real2d("edge_sign_on_cell", m_ncells, maxedges);
   m_kite_index_on_cell = Int2d("kite_index_on_cell", m_ncells, maxedges);
 
   m_max_level_edge_bot = Int1d("max_level_edge_bot", m_nedges);
@@ -16,7 +16,7 @@ void MPASMesh::finalize_mesh() {
 
   m_max_level_vertex_bot = Int1d("max_level_vertex_bot", m_nvertices);
   m_max_level_vertex_top = Int1d("max_level_vertex_top", m_nvertices);
-  m_edge_sign_on_vertex = Int2d("edge_sign_on_vertex", m_nvertices, 3);
+  m_edge_sign_on_vertex = Real2d("edge_sign_on_vertex", m_nvertices, 3);
 
   parallel_for(
       "finalize_cell", m_ncells, YAKL_CLASS_LAMBDA(Int icell) {
