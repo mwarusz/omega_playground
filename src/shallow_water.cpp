@@ -321,12 +321,13 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
                    h_flux_edge(jedge, k) * vn_edge(jedge, k);
         }
 
+        Real inv_area_cell = 1._fp / area_cell(icell);
         if (add_mode == AddMode::increment) {
-          h_tend_cell(icell, k) += -accum / area_cell(icell);
+          h_tend_cell(icell, k) += -accum * inv_area_cell;
         }
 
         if (add_mode == AddMode::replace) {
-          h_tend_cell(icell, k) = -accum / area_cell(icell);
+          h_tend_cell(icell, k) = -accum * inv_area_cell;
         }
       });
 }
