@@ -163,8 +163,10 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
             << yakl::intrinsics::maxval(h_cell) << std::endl;
   std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
             << yakl::intrinsics::maxval(vn_edge) << std::endl;
-  std::cout << "Final tr: " << yakl::intrinsics::minval(tr_cell) << " "
-            << yakl::intrinsics::maxval(tr_cell) << std::endl;
+  if (ntracers > 0) {
+    std::cout << "Final tr: " << yakl::intrinsics::minval(tr_cell) << " "
+              << yakl::intrinsics::maxval(tr_cell) << std::endl;
+  }
 }
 
 int main(int argc, char *argv[]) {
