@@ -35,7 +35,11 @@ set(OMEGA_SOURCES
 if (${OMEGA_VECTOR_LENGTH} EQUAL 1)
   list(APPEND OMEGA_SOURCES src/shallow_water.cpp)
 else()
-  list(APPEND OMEGA_SOURCES src/shallow_water_vectorized.cpp)
+  if (${CMAKE_CXX_STANDARD} EQUAL 23)
+    list(APPEND OMEGA_SOURCES src/shallow_water_vectorized_cxx_simd.cpp)
+  else()
+    list(APPEND OMEGA_SOURCES src/shallow_water_vectorized_yakl_packs.cpp)
+  endif()
 endif()
 
 add_library(omega ${OMEGA_SOURCES})
