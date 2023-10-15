@@ -365,8 +365,8 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
           iterate_over_pack(
               [&](Int klane) {
                 Int k = kv * vector_length + klane;
-                norm_f_vertex_pack(klane) = norm_rvort_vertex(jvertex, k);
-                norm_rvort_vertex_pack(klane) = norm_f_vertex(jvertex, k);
+                norm_rvort_vertex_pack(klane) = norm_rvort_vertex(jvertex, k);
+                norm_f_vertex_pack(klane) = norm_f_vertex(jvertex, k);
               },
               PackIterConfig<vector_length, true>());
 
