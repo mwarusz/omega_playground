@@ -83,17 +83,13 @@ struct ShallowWaterModel : ShallowWaterModelBase {
   Real2d m_ke_cell;
   Real2d m_div_cell;
   Real3d m_norm_tr_cell;
-  // Real2d m_rvort_cell;
-  // Real2d m_norm_rvort_cell;
 
   Real2d m_h_flux_edge;
   Real2d m_h_mean_edge;
   Real2d m_h_drag_edge;
-  Real2d m_vt_edge;
   Real2d m_norm_rvort_edge;
   Real2d m_norm_f_edge;
 
-  // Real2d m_rcirc_vertex;
   Real2d m_rvort_vertex;
   Real2d m_norm_rvort_vertex;
   Real2d m_norm_f_vertex;
