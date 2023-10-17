@@ -2,6 +2,9 @@
 #include <memory>
 #include <omega.hpp>
 #include <string>
+#ifdef BENCHMARK_PROFILE_CUDA
+#include <cuda_profiler_api.h>
+#endif
 
 using namespace omega;
 
@@ -138,10 +141,18 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
+#ifdef BENCHMARK_PROFILE_CUDA
+  cudaProfilerStart();
+#endif
+
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
+
+#ifdef BENCHMARK_PROFILE_CUDA
+  cudaProfilerStop();
+#endif
 
   std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
             << yakl::intrinsics::maxval(h_cell) << std::endl;
