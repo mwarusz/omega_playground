@@ -32,7 +32,7 @@ yakl_process_target(omega)
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-target_link_libraries(omega NetCDF::NetCDF)
+target_link_libraries(omega NetCDF::NetCDF ${OMEGA_LINK_FLAGS})
 
 add_subdirectory(benchmark)
 add_subdirectory(experiment)
