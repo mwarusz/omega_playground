@@ -145,10 +145,12 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   cudaProfilerStart();
 #endif
 
+  yakl::timer_start("time_loop");
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
+  yakl::timer_stop("time_loop");
 
 #ifdef BENCHMARK_PROFILE_CUDA
   cudaProfilerStop();
