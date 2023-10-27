@@ -4,8 +4,8 @@
 namespace stdex = std::experimental;
 
 namespace omega {
-  constexpr auto aligned = stdex::element_aligned;
-  using Pack = stdex::fixed_size_simd<Real, vector_length>;
+constexpr auto aligned = stdex::element_aligned;
+using Pack = stdex::fixed_size_simd<Real, vector_length>;
 // Base
 
 ShallowWaterModelBase::ShallowWaterModelBase(MPASMesh *mesh,
@@ -123,17 +123,13 @@ ShallowWaterModel::ShallowWaterModel(MPASMesh *mesh,
       m_eddy_diff2(params.m_eddy_diff2), m_eddy_diff4(params.m_eddy_diff4),
       m_ke_cell("ke_cell", mesh->m_ncells, mesh->m_nlayers),
       m_div_cell("div_cell", mesh->m_ncells, mesh->m_nlayers),
-      // m_rvort_cell("rvort_cell", mesh->m_ncells, mesh->m_nlayers),
-      // m_norm_rvort_cell("norm_rvort_cell", mesh->m_ncells, mesh->m_nlayers),
       m_norm_tr_cell("norm_tr_cell", params.m_ntracers, mesh->m_ncells,
                      mesh->m_nlayers),
       m_h_flux_edge("h_flux_edge", mesh->m_nedges, mesh->m_nlayers),
       m_h_mean_edge("h_mean_edge", mesh->m_nedges, mesh->m_nlayers),
       m_h_drag_edge("h_drag_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_vt_edge("vt_edge", mesh->m_nedges, mesh->m_nlayers),
       m_norm_rvort_edge("norm_rvort_edge", mesh->m_nedges, mesh->m_nlayers),
       m_norm_f_edge("norm_f_edge", mesh->m_nedges, mesh->m_nlayers),
-      // m_rcirc_vertex("rcirc_vertex", mesh->m_nvertices, mesh->m_nlayers),
       m_rvort_vertex("rvort_vertex", mesh->m_nvertices, mesh->m_nlayers),
       m_norm_rvort_vertex("norm_rvort_vertex", mesh->m_nvertices,
                           mesh->m_nlayers),
@@ -149,18 +145,13 @@ void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
 
 void ShallowWaterModel::compute_cell_auxiliary_variables(
     RealConst2d h_cell, RealConst2d vn_edge, RealConst3d tr_cell) const {
-  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
   YAKL_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
   YAKL_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
   YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
   YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
-  YAKL_SCOPE(vertices_on_cell, m_mesh->m_vertices_on_cell);
-  YAKL_SCOPE(kite_index_on_cell, m_mesh->m_kite_index_on_cell);
-  YAKL_SCOPE(kiteareas_on_vertex, m_mesh->m_kiteareas_on_vertex);
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
 
-  // YAKL_SCOPE(rvort_cell, m_rvort_cell);
   YAKL_SCOPE(ke_cell, m_ke_cell);
   YAKL_SCOPE(div_cell, m_div_cell);
   YAKL_SCOPE(norm_tr_cell, m_norm_tr_cell);
@@ -188,14 +179,6 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
         div_pack *= inv_area_cell;
 
         Pack h_pack;
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      div_cell(icell, k) = div_pack(klane);
-        //      ke_cell(icell, k) = ke_pack(klane);
-        //      h_pack(klane) = h_cell(icell, k);
-        //    },
-        //    PackIterConfig<vector_length, true>());
         div_pack.copy_to(&div_cell(icell, k), aligned);
         ke_pack.copy_to(&ke_cell(icell, k), aligned);
         h_pack.copy_from(&h_cell(icell, k), aligned);
@@ -203,21 +186,8 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
         auto inv_h_pack = 1._fp / h_pack;
         for (Int l = 0; l < ntracers; ++l) {
           Pack norm_tr_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      norm_tr_pack(klane) = tr_cell(l, icell, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           norm_tr_pack.copy_from(&tr_cell(l, icell, k), aligned);
           norm_tr_pack *= inv_h_pack;
-
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      norm_tr_cell(l, icell, k) = norm_tr_pack(klane);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           norm_tr_pack.copy_to(&norm_tr_cell(l, icell, k), aligned);
         }
       });
@@ -231,9 +201,7 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
   YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
   YAKL_SCOPE(kiteareas_on_vertex, m_mesh->m_kiteareas_on_vertex);
   YAKL_SCOPE(cells_on_vertex, m_mesh->m_cells_on_vertex);
-  // YAKL_SCOPE(max_level_vertex_bot, m_mesh->m_max_level_vertex_bot);
 
-  // YAKL_SCOPE(rcirc_vertex, m_rcirc_vertex);
   YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
   YAKL_SCOPE(f_vertex, m_f_vertex);
   YAKL_SCOPE(norm_rvort_vertex, m_norm_rvort_vertex);
@@ -251,12 +219,6 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
           Int jedge = edges_on_vertex(ivertex, j);
 
           Pack vn_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      vn_pack(klane) = vn_edge(jedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           vn_pack.copy_from(&vn_edge(jedge, k), aligned);
 
           rvort_pack +=
@@ -270,12 +232,6 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
           Int jcell = cells_on_vertex(ivertex, j);
 
           Pack h_cell_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      h_cell_pack(klane) = h_cell(jcell, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           h_cell_pack.copy_from(&h_cell(jcell, k), aligned);
 
           h_vertex_pack += kiteareas_on_vertex(ivertex, j) * h_cell_pack;
@@ -286,14 +242,6 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
         auto norm_rvort_pack = inv_h_vertex_pack * rvort_pack;
         auto norm_f_pack = inv_h_vertex_pack * f_vertex(ivertex);
 
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      rvort_vertex(ivertex, k) = rvort_pack(klane);
-        //      norm_rvort_vertex(ivertex, k) = norm_rvort_pack(klane);
-        //      norm_f_vertex(ivertex, k) = norm_f_pack(klane);
-        //    },
-        //    PackIterConfig<vector_length, true>());
         rvort_pack.copy_to(&rvort_vertex(ivertex, k), aligned);
         norm_rvort_pack.copy_to(&norm_rvort_vertex(ivertex, k), aligned);
         norm_f_pack.copy_to(&norm_f_vertex(ivertex, k), aligned);
@@ -303,18 +251,12 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
 void ShallowWaterModel::compute_edge_auxiliary_variables(
     RealConst2d h_cell, RealConst2d vn_edge, RealConst3d tr_cell) const {
 
-  YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
   YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
-  YAKL_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
-  YAKL_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
-  YAKL_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
-  YAKL_SCOPE(max_level_edge_bot, m_mesh->m_max_level_edge_bot);
   YAKL_SCOPE(vertices_on_edge, m_mesh->m_vertices_on_edge);
 
   YAKL_SCOPE(h_mean_edge, m_h_mean_edge);
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
   YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
-  YAKL_SCOPE(vt_edge, m_vt_edge);
   YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
   YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
   YAKL_SCOPE(norm_rvort_vertex, m_norm_rvort_vertex);
@@ -331,33 +273,11 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
           Int jcell = cells_on_edge(iedge, j);
 
           Pack h_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      h_pack(klane) = h_cell(jcell, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           h_pack.copy_from(&h_cell(jcell, k), aligned);
 
           h_mean_pack += h_pack;
         }
         h_mean_pack *= 0.5_fp;
-
-        Pack vt_pack;
-        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
-          Int jedge = edges_on_edge(iedge, j);
-
-          Pack vn_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      vn_pack(klane) = vn_edge(jedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
-          vn_pack.copy_from(&vn_edge(jedge, k), aligned);
-
-          vt_pack += weights_on_edge(iedge, j) * vn_pack;
-        }
 
         Pack norm_f_edge_pack;
         Pack norm_rvort_edge_pack;
@@ -368,14 +288,8 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
 
           Pack norm_f_vertex_pack;
           Pack norm_rvort_vertex_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      norm_f_vertex_pack(klane) = norm_rvort_vertex(jvertex, k);
-          //      norm_rvort_vertex_pack(klane) = norm_f_vertex(jvertex, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
-          norm_rvort_vertex_pack.copy_from(&norm_rvort_vertex(jvertex, k), aligned);
+          norm_rvort_vertex_pack.copy_from(&norm_rvort_vertex(jvertex, k),
+                                           aligned);
           norm_f_vertex_pack.copy_from(&norm_f_vertex(jvertex, k), aligned);
 
           norm_rvort_edge_pack += norm_rvort_vertex_pack;
@@ -384,25 +298,11 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
         norm_rvort_edge_pack *= 0.5_fp;
         norm_f_edge_pack *= 0.5_fp;
 
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      h_mean_edge(iedge, k) = h_mean_pack(klane);
-        //      h_flux_edge(iedge, k) = h_mean_pack(klane);
-        //      h_drag_edge(iedge, k) = h_mean_pack(klane);
-
-        //      vt_edge(iedge, k) = vt_pack(klane);
-
-        //      norm_rvort_edge(iedge, k) = norm_rvort_edge_pack(klane);
-        //      norm_f_edge(iedge, k) = norm_f_edge_pack(klane);
-        //    },
-        //    PackIterConfig<vector_length, true>());
-          h_mean_pack.copy_to(&h_mean_edge(iedge, k), aligned);
-          h_mean_pack.copy_to(&h_flux_edge(iedge, k), aligned);
-          h_mean_pack.copy_to(&h_drag_edge(iedge, k), aligned);
-          vt_pack.copy_to(&vt_edge(iedge, k), aligned);
-          norm_rvort_edge_pack.copy_to(&norm_rvort_edge(iedge, k), aligned);
-          norm_f_edge_pack.copy_to(&norm_f_edge(iedge, k), aligned);
+        h_mean_pack.copy_to(&h_mean_edge(iedge, k), aligned);
+        h_mean_pack.copy_to(&h_flux_edge(iedge, k), aligned);
+        h_mean_pack.copy_to(&h_drag_edge(iedge, k), aligned);
+        norm_rvort_edge_pack.copy_to(&norm_rvort_edge(iedge, k), aligned);
+        norm_f_edge_pack.copy_to(&norm_f_edge(iedge, k), aligned);
       });
 }
 
@@ -415,7 +315,6 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
   YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
-  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
 
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
   parallel_for(
@@ -429,13 +328,6 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
           Int jedge = edges_on_cell(icell, j);
 
           Pack h_flux_edge_pack, vn_edge_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      h_flux_edge_pack(klane) = h_flux_edge(jedge, k);
-          //      vn_edge_pack(klane) = vn_edge(jedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           h_flux_edge_pack.copy_from(&h_flux_edge(jedge, k), aligned);
           vn_edge_pack.copy_from(&vn_edge(jedge, k), aligned);
 
@@ -446,25 +338,14 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
         Real inv_area_cell = 1._fp / area_cell(icell);
         h_tend_cell_pack *= -inv_area_cell;
 
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      if (add_mode == AddMode::increment) {
-        //        h_tend_cell(icell, k) += h_tend_cell_pack(klane);
-        //      }
-        //      if (add_mode == AddMode::replace) {
-        //        h_tend_cell(icell, k) = h_tend_cell_pack(klane);
-        //      }
-        //    },
-        //    PackIterConfig<vector_length, true>());
         if (add_mode == AddMode::increment) {
-            Pack prev_h_tend_cell_pack;
-            prev_h_tend_cell_pack.copy_from(&h_tend_cell(icell, k), aligned);
-            prev_h_tend_cell_pack += h_tend_cell_pack;
-            prev_h_tend_cell_pack.copy_to(&h_tend_cell(icell, k), aligned);
+          Pack prev_h_tend_cell_pack;
+          prev_h_tend_cell_pack.copy_from(&h_tend_cell(icell, k), aligned);
+          prev_h_tend_cell_pack += h_tend_cell_pack;
+          prev_h_tend_cell_pack.copy_to(&h_tend_cell(icell, k), aligned);
         }
         if (add_mode == AddMode::replace) {
-            h_tend_cell_pack.copy_to(&h_tend_cell(icell, k), aligned);
+          h_tend_cell_pack.copy_to(&h_tend_cell(icell, k), aligned);
         }
       });
 }
@@ -473,7 +354,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                                             RealConst2d h_cell,
                                             RealConst2d vn_edge,
                                             AddMode add_mode) const {
-  YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
   YAKL_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
   YAKL_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
   YAKL_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
@@ -489,11 +369,11 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
   YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
-  YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
+  // YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
   YAKL_SCOPE(ke_cell, m_ke_cell);
   YAKL_SCOPE(div_cell, m_div_cell);
   YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
-  YAKL_SCOPE(drag_coeff, m_drag_coeff);
+  // YAKL_SCOPE(drag_coeff, m_drag_coeff);
   YAKL_SCOPE(visc_del2, m_visc_del2);
   YAKL_SCOPE(visc_del4, m_visc_del4);
 
@@ -532,15 +412,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Pack rvort0_pack;
           Pack rvort1_pack;
 
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      div0_pack(klane) = div_cell(icell0, k);
-          //      div1_pack(klane) = div_cell(icell1, k);
-          //      rvort0_pack(klane) = rvort_vertex(ivertex0, k);
-          //      rvort1_pack(klane) = rvort_vertex(ivertex1, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           div0_pack.copy_from(&div_cell(icell0, k), aligned);
           div1_pack.copy_from(&div_cell(icell1, k), aligned);
           rvort0_pack.copy_from(&rvort_vertex(ivertex0, k), aligned);
@@ -550,12 +421,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           del2u_pack = (div1_pack - div0_pack) * dc_edge_inv -
                        (rvort1_pack - rvort0_pack) * dv_edge_inv;
 
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      del2u_edge(iedge, k) = del2u_pack(klane);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           del2u_pack.copy_to(&del2u_edge(iedge, k), aligned);
         });
 
@@ -570,12 +435,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
             Int jedge = edges_on_cell(icell, j);
 
             Pack del2u_pack;
-            //iterate_over_pack(
-            //    [&](Int klane) {
-            //      Int k = kv * vector_length + klane;
-            //      del2u_pack(klane) = del2u_edge(jedge, k);
-            //    },
-            //    PackIterConfig<vector_length, true>());
             del2u_pack.copy_from(&del2u_edge(jedge, k), aligned);
 
             del2div_pack +=
@@ -583,12 +442,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           }
           Real inv_area_cell = 1._fp / area_cell(icell);
           del2div_pack *= inv_area_cell;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      del2div_cell(icell, k) = del2div_pack(klane);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           del2div_pack.copy_to(&del2div_cell(icell, k), aligned);
         });
 
@@ -603,12 +456,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
             Int jedge = edges_on_vertex(ivertex, j);
 
             Pack vn_pack;
-            //iterate_over_pack(
-            //    [&](Int klane) {
-            //      Int k = kv * vector_length + klane;
-            //      vn_pack(klane) = vn_edge(jedge, k);
-            //    },
-            //    PackIterConfig<vector_length, true>());
             vn_pack.copy_from(&vn_edge(jedge, k), aligned);
 
             del2rvort_pack +=
@@ -617,12 +464,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Real inv_area_triangle = 1._fp / area_triangle(ivertex);
           del2rvort_pack *= inv_area_triangle;
 
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      del2rvort_vertex(ivertex, k) = del2rvort_pack(klane);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           del2rvort_pack.copy_to(&del2rvort_vertex(ivertex, k), aligned);
         });
   }
@@ -645,17 +486,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Pack norm_rvort_pack;
           Pack h_flux_pack;
           Pack vn_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      h_flux_pack(klane) = h_flux_edge(jedge, k);
-          //      vn_pack(klane) = vn_edge(jedge, k);
-          //      norm_rvort_iedge_pack(klane) = norm_rvort_edge(iedge, k);
-          //      norm_f_iedge_pack(klane) = norm_f_edge(iedge, k);
-          //      norm_rvort_jedge_pack(klane) = norm_rvort_edge(jedge, k);
-          //      norm_f_jedge_pack(klane) = norm_f_edge(jedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           h_flux_pack.copy_from(&h_flux_edge(jedge, k), aligned);
           vn_pack.copy_from(&vn_edge(jedge, k), aligned);
           norm_rvort_iedge_pack.copy_from(&norm_rvort_edge(iedge, k), aligned);
@@ -678,15 +508,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         Pack ke1_pack;
         Pack h0_pack;
         Pack h1_pack;
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      h0_pack(klane) = h_cell(icell0, k);
-        //      ke0_pack(klane) = ke_cell(icell0, k);
-        //      h1_pack(klane) = h_cell(icell1, k);
-        //      ke1_pack(klane) = ke_cell(icell1, k);
-        //    },
-        //    PackIterConfig<vector_length, true>());
         h0_pack.copy_from(&h_cell(icell0, k), aligned);
         ke0_pack.copy_from(&ke_cell(icell0, k), aligned);
         h1_pack.copy_from(&h_cell(icell1, k), aligned);
@@ -714,16 +535,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Pack rvort0_pack;
           Pack rvort1_pack;
           Pack edge_mask_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      div0_pack(klane) = div_cell(icell0, k);
-          //      rvort0_pack(klane) = rvort_vertex(ivertex0, k);
-          //      div1_pack(klane) = div_cell(icell1, k);
-          //      rvort1_pack(klane) = rvort_vertex(ivertex1, k);
-          //      edge_mask_pack(klane) = edge_mask(iedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           div0_pack.copy_from(&div_cell(icell0, k), aligned);
           rvort0_pack.copy_from(&rvort_vertex(ivertex0, k), aligned);
           div1_pack.copy_from(&div_cell(icell1, k), aligned);
@@ -747,16 +558,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Pack del2rvort1_pack;
           Pack edge_mask_pack;
 
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      del2div0_pack(klane) = del2div_cell(icell0, k);
-          //      del2rvort0_pack(klane) = del2rvort_vertex(ivertex0, k);
-          //      del2div1_pack(klane) = del2div_cell(icell1, k);
-          //      del2rvort1_pack(klane) = del2rvort_vertex(ivertex1, k);
-          //      edge_mask_pack(klane) = edge_mask(iedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           del2div0_pack.copy_from(&del2div_cell(icell0, k), aligned);
           del2rvort0_pack.copy_from(&del2rvort_vertex(ivertex0, k), aligned);
           del2div1_pack.copy_from(&del2div_cell(icell1, k), aligned);
@@ -769,17 +570,6 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                            (del2rvort1_pack - del2rvort0_pack) * inv_dv_edge);
         }
 
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      if (add_mode == AddMode::increment) {
-        //        vn_tend_edge(iedge, k) += vn_tend_pack(klane);
-        //      }
-        //      if (add_mode == AddMode::replace) {
-        //        vn_tend_edge(iedge, k) = vn_tend_pack(klane);
-        //      }
-        //    },
-        //    PackIterConfig<vector_length, true>());
         if (add_mode == AddMode::increment) {
           Pack prev_vn_tend_pack;
           prev_vn_tend_pack.copy_from(&vn_tend_edge(iedge, k), aligned);
@@ -835,14 +625,6 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
             Pack norm_tr0_pack;
             Pack norm_tr1_pack;
             Pack h_mean_pack;
-            //iterate_over_pack(
-            //    [&](Int klane) {
-            //      Int k = kv * vector_length + klane;
-            //      norm_tr0_pack(klane) = norm_tr_cell(l, jcell0, k);
-            //      norm_tr1_pack(klane) = norm_tr_cell(l, jcell1, k);
-            //      h_mean_pack(klane) = h_mean_edge(jedge, k);
-            //    },
-            //    PackIterConfig<vector_length, true>());
             norm_tr0_pack.copy_from(&norm_tr_cell(l, jcell0, k), aligned);
             norm_tr1_pack.copy_from(&norm_tr_cell(l, jcell1, k), aligned);
             h_mean_pack.copy_from(&h_mean_edge(jedge, k), aligned);
@@ -854,12 +636,6 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           Real inv_area_cell = 1._fp / area_cell(icell);
           tr_del2_pack *= inv_area_cell;
 
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      tmp_tr_del2_cell(l, icell, k) = tr_del2_pack(klane);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           tr_del2_pack.copy_to(&tmp_tr_del2_cell(l, icell, k), aligned);
         });
   }
@@ -882,15 +658,6 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           Pack norm_tr1_pack;
           Pack h_flux_pack;
           Pack vn_pack;
-          //iterate_over_pack(
-          //    [&](Int klane) {
-          //      Int k = kv * vector_length + klane;
-          //      norm_tr0_pack(klane) = norm_tr_cell(l, jcell0, k);
-          //      norm_tr1_pack(klane) = norm_tr_cell(l, jcell1, k);
-          //      h_flux_pack(klane) = h_flux_edge(jedge, k);
-          //      vn_pack(klane) = vn_edge(jedge, k);
-          //    },
-          //    PackIterConfig<vector_length, true>());
           norm_tr0_pack.copy_from(&norm_tr_cell(l, jcell0, k), aligned);
           norm_tr1_pack.copy_from(&norm_tr_cell(l, jcell1, k), aligned);
           h_flux_pack.copy_from(&h_flux_edge(jedge, k), aligned);
@@ -905,12 +672,6 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           // diffusion
           if (eddy_diff2 > 0) {
             Pack h_mean_pack;
-            //iterate_over_pack(
-            //    [&](Int klane) {
-            //      Int k = kv * vector_length + klane;
-            //      h_mean_pack(klane) = h_mean_edge(jedge, k);
-            //    },
-            //    PackIterConfig<vector_length, true>());
             h_mean_pack.copy_from(&h_mean_edge(jedge, k), aligned);
 
             tr_flux_pack += eddy_diff2 * h_mean_pack * inv_dc_edge *
@@ -921,13 +682,6 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           if (eddy_diff4 > 0) {
             Pack tr0_del2_pack;
             Pack tr1_del2_pack;
-            //iterate_over_pack(
-            //    [&](Int klane) {
-            //      Int k = kv * vector_length + klane;
-            //      tr0_del2_pack(klane) = tmp_tr_del2_cell(l, jcell0, k);
-            //      tr1_del2_pack(klane) = tmp_tr_del2_cell(l, jcell1, k);
-            //    },
-            //    PackIterConfig<vector_length, true>());
             tr0_del2_pack.copy_from(&tmp_tr_del2_cell(l, jcell0, k), aligned);
             tr1_del2_pack.copy_from(&tmp_tr_del2_cell(l, jcell1, k), aligned);
 
@@ -943,17 +697,6 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
         Real inv_area_cell = 1._fp / area_cell(icell);
         tr_tend_pack *= inv_area_cell;
 
-        //iterate_over_pack(
-        //    [&](Int klane) {
-        //      Int k = kv * vector_length + klane;
-        //      if (add_mode == AddMode::increment) {
-        //        tr_tend_cell(l, icell, k) += tr_tend_pack(klane);
-        //      }
-        //      if (add_mode == AddMode::replace) {
-        //        tr_tend_cell(l, icell, k) = tr_tend_pack(klane);
-        //      }
-        //    },
-        //    PackIterConfig<vector_length, true>());
         if (add_mode == AddMode::increment) {
           Pack prev_tr_tend_pack;
           prev_tr_tend_pack.copy_from(&tr_tend_cell(l, icell, k), aligned);
@@ -1012,7 +755,6 @@ void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
   YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
-  YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
   YAKL_SCOPE(h0, m_h0);
 
   parallel_for(
@@ -1040,10 +782,8 @@ void LinearShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
   YAKL_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
   YAKL_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
-  YAKL_SCOPE(dv_edge, m_mesh->m_dv_edge);
   YAKL_SCOPE(dc_edge, m_mesh->m_dc_edge);
   YAKL_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
-  YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
   YAKL_SCOPE(grav, m_grav);
   YAKL_SCOPE(f_edge, m_f_edge);
 
