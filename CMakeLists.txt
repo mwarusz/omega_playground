@@ -11,6 +11,9 @@ if ("${YAKL_ARCH}" STREQUAL "CUDA")
 endif()
 
 include(FetchContent)
+
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+
 FetchContent_Declare(yakl
   GIT_REPOSITORY https://github.com/mrnorman/YAKL.git
   GIT_TAG main
