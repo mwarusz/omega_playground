@@ -2,7 +2,14 @@ cmake_minimum_required(VERSION 3.20)
 
 project(omega_playground CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "omega vector length")
+set(OMEGA_USE_CXX_SIMD OFF CACHE BOOL "use std::simd for vectorization")
+
+if (${OMEGA_USE_CXX_SIMD})
+  set(CMAKE_CXX_STANDARD 23)
+else()
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -23,7 +30,6 @@ find_package(NetCDF REQUIRED)
 
 FetchContent_MakeAvailable(yakl)
 
-set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "omega vector length")
 
 set(OMEGA_SOURCES
   src/mpas_mesh.cpp
@@ -35,7 +41,7 @@ set(OMEGA_SOURCES
 if (${OMEGA_VECTOR_LENGTH} EQUAL 1)
   list(APPEND OMEGA_SOURCES src/shallow_water.cpp)
 else()
-  if (${CMAKE_CXX_STANDARD} EQUAL 23)
+  if (${OMEGA_USE_CXX_SIMD})
     list(APPEND OMEGA_SOURCES src/shallow_water_vectorized_cxx_simd.cpp)
   else()
     list(APPEND OMEGA_SOURCES src/shallow_water_vectorized_yakl_packs.cpp)
