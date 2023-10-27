@@ -317,11 +317,11 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
   YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
-  YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
+  // YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
   YAKL_SCOPE(ke_cell, m_ke_cell);
   YAKL_SCOPE(div_cell, m_div_cell);
   YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
-  YAKL_SCOPE(drag_coeff, m_drag_coeff);
+  // YAKL_SCOPE(drag_coeff, m_drag_coeff);
   YAKL_SCOPE(visc_del2, m_visc_del2);
   YAKL_SCOPE(visc_del4, m_visc_del4);
 
@@ -422,13 +422,15 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                        grav * (h_cell(icell1, k) - h_cell(icell0, k))) *
                       inv_dc_edge;
 
-        Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
-        Real drag_force = (k == (max_level_edge_top(iedge) - 1))
-                              ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1) *
-                                    vn_edge(iedge, k) * inv_h_drag_edge
-                              : 0;
+        vn_tend = qt - grad_B;
 
-        vn_tend = qt - grad_B + drag_force;
+        // Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
+        // Real drag_force = (k == (max_level_edge_top(iedge) - 1))
+        //                       ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1)
+        //                       *
+        //                             vn_edge(iedge, k) * inv_h_drag_edge
+        //                       : 0;
+        // vn_tend += drag_force;
 
         Real inv_dv_edge = 1._fp / dv_edge(iedge);
         // viscosity
