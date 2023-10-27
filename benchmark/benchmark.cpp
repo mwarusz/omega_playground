@@ -12,7 +12,7 @@ using namespace omega;
 struct DoubleVortex {
   Real m_g = 9.80616;
   Real m_lx = 5000000;
-  Real m_ly = 5000000;
+  Real m_ly = 5000000 * std::sqrt(3) / 2;
   Real m_coriolis = 0.00006147;
   Real m_h0 = 750;
   Real m_ox = 0.1;
@@ -101,7 +101,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
 
   ShallowWaterState state(shallow_water);
 
-  LSRKStepper stepper(shallow_water, 1);
+  LSRKStepper stepper(shallow_water, nsteps == 1 ? 1 : 5);
 
   Real cfl = 0.1;
   Real dt =

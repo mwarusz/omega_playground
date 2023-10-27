@@ -6,7 +6,7 @@ on Frontier for the MI250X GPU do:
 ```
 mdkir build
 cd build
-source ../prepare_build.sh frontier-mi250x
+source ../prepare_build.sh frontier-gpu
 make -j8
 ```
 
