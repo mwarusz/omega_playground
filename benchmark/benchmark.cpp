@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <omega.hpp>
@@ -145,12 +146,17 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   cudaProfilerStart();
 #endif
 
+  yakl::fence();
+  auto ts = std::chrono::steady_clock::now();
   yakl::timer_start("time_loop");
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
+  yakl::fence();
   yakl::timer_stop("time_loop");
+  auto te = std::chrono::steady_clock::now();
+  auto time_loop_second = std::chrono::duration<double>(te - ts).count();
 
 #ifdef BENCHMARK_PROFILE_CUDA
   cudaProfilerStop();
@@ -164,6 +170,8 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
     std::cout << "Final tr: " << yakl::intrinsics::minval(tr_cell) << " "
               << yakl::intrinsics::maxval(tr_cell) << std::endl;
   }
+
+  std::cerr << time_loop_second << std::endl;
 }
 
 int main(int argc, char *argv[]) {
