@@ -11,8 +11,6 @@ outdir=${1:-"frontier_thread_scaling"}
 script_path=$(scontrol show job "$SLURM_JOB_ID" | awk -F= '/Command=/{print $2}')
 script_dir=$(dirname $script_path)
 
-source $script_dir/../../machines/frontier-cpu-scalar.env
-
 threads="1 2 4 8 16 24 32 40 48 56"
 nvertlevels=64
 ntracers=1
