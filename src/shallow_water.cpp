@@ -474,6 +474,8 @@ __global__ void compute_tmp_tr_del2_cell(Real* tmp_tr_del2_cell,
                                          Real const * mesh_scaling_del2, 
                                          Real const * dc_edge, 
                                          Real const * dv_edge, 
+                                         Real const * edge_sign_on_cell, 
+                                         Real const * area_cell, 
                                          Int const * nedges_on_cell,
                                          Int const * edges_on_cell,
                                          Int const * cells_on_edge,
@@ -555,14 +557,16 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
         });
 #else
-    dim3 threads(m_mesh->m_nlayers, 4)
-    dim3 blocks(1, m_mesh->m_ncells / 4, ntracers)
+    dim3 threads(m_mesh->m_nlayers, 4);
+    dim3 blocks(1, m_mesh->m_ncells / 4, ntracers);
     compute_tmp_tr_del2_cell<<<blocks,threads>>>(tmp_tr_del2_cell.data(),
                                                  norm_tr_cell.data(), 
                                                  h_mean_edge.data(), 
                                                  mesh_scaling_del2.data(), 
                                                  dc_edge.data(), 
                                                  dv_edge.data(), 
+                                                 edge_sign_on_cell.data(), 
+                                                 area_cell.data(), 
                                                  nedges_on_cell.data(),
                                                  edges_on_cell.data(),
                                                  cells_on_edge.data(),
