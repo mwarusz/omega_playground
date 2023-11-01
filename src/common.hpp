@@ -14,6 +14,8 @@ constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
 
 constexpr Real pi = M_PI;
 
+constexpr Int maxedges = 6;
+
 using yakl::SArray;
 using yakl::c::Bounds;
 using yakl::c::parallel_for;
