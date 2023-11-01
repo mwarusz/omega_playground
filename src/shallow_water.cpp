@@ -488,34 +488,34 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   YAKL_SCOPE(eddy_diff2, m_eddy_diff2);
   YAKL_SCOPE(eddy_diff4, m_eddy_diff4);
 
-  Real3d tmp_tr_del2_cell;
-  if (eddy_diff4 > 0) {
-    tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
-                              m_mesh->m_nlayers);
-    parallel_for(
-        "compute_tmp_tr_del2_cell",
-        SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          Real tr_del2 = -0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
+  //Real3d tmp_tr_del2_cell;
+  //if (eddy_diff4 > 0) {
+  //  tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
+  //                            m_mesh->m_nlayers);
+  //  parallel_for(
+  //      "compute_tmp_tr_del2_cell",
+  //      SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
+  //      YAKL_LAMBDA(Int l, Int icell, Int k) {
+  //        Real tr_del2 = -0;
+  //        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+  //          Int jedge = edges_on_cell(icell, j);
 
-            Int jcell0 = cells_on_edge(jedge, 0);
-            Int jcell1 = cells_on_edge(jedge, 1);
+  //          Int jcell0 = cells_on_edge(jedge, 0);
+  //          Int jcell1 = cells_on_edge(jedge, 1);
 
-            Real inv_dc_edge = 1._fp / dc_edge(jedge);
-            Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
-                inv_dc_edge;
+  //          Real inv_dc_edge = 1._fp / dc_edge(jedge);
+  //          Real grad_tr_edge =
+  //              (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
+  //              inv_dc_edge;
 
-            tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
-                       grad_tr_edge;
-          }
-          Real inv_area_cell = 1._fp / area_cell(icell);
-          tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
-        });
-  }
+  //          tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+  //                     h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
+  //                     grad_tr_edge;
+  //        }
+  //        Real inv_area_cell = 1._fp / area_cell(icell);
+  //        tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
+  //      });
+  //}
 
   parallel_for(
       "compute_tr_tend",
@@ -548,8 +548,50 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
 
           // hyperdiffusion
           if (eddy_diff4 > 0) {
-            Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
-                                      tmp_tr_del2_cell(l, jcell0, k)) *
+            //Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
+            //                          tmp_tr_del2_cell(l, jcell0, k)) *
+            //                         inv_dc_edge;
+
+
+            Real tmp_tr_del2_cell1 = 0;
+            for (Int j = 0; j < nedges_on_cell(jcell1); ++j) {
+              Int jedge_ = edges_on_cell(jcell1, j);
+              Int icell0_ = cells_on_edge(jedge_, 0);
+              Int icell1_ = cells_on_edge(jedge_, 1);
+              Real inv_dc_edge_ = 1._fp / dc_edge(jedge_);
+            
+              Real grad_tr_edge =
+                (norm_tr_cell(l, icell1_, k) - norm_tr_cell(l, icell0_, k)) *
+                inv_dc_edge;
+
+              tmp_tr_del2_cell1 += dv_edge(jedge_) * edge_sign_on_cell(jcell1, j) *
+                         h_mean_edge(jedge_, k) * mesh_scaling_del2(jedge_) *
+                         grad_tr_edge;
+            }
+            Real inv_area_cell1 = 1._fp / area_cell(jcell1);
+            tmp_tr_del2_cell1 *= inv_area_cell1;
+
+
+            Real tmp_tr_del2_cell0 = 0;
+            for (Int j = 0; j < nedges_on_cell(jcell0); ++j) {
+              Int jedge_ = edges_on_cell(jcell0, j);
+              Int icell0_ = cells_on_edge(jedge_, 0);
+              Int icell1_ = cells_on_edge(jedge_, 1);
+              Real inv_dc_edge_ = 1._fp / dc_edge(jedge_);
+            
+              Real grad_tr_edge =
+                (norm_tr_cell(l, icell1_, k) - norm_tr_cell(l, icell0_, k)) *
+                inv_dc_edge;
+
+              tmp_tr_del2_cell0 += dv_edge(jedge_) * edge_sign_on_cell(jcell0, j) *
+                         h_mean_edge(jedge_, k) * mesh_scaling_del2(jedge_) *
+                         grad_tr_edge;
+            }
+            Real inv_area_cell0 = 1._fp / area_cell(jcell0);
+            tmp_tr_del2_cell0 *= inv_area_cell0;
+
+            Real grad_tr_del2_edge = (tmp_tr_del2_cell1 -
+                                      tmp_tr_del2_cell0) *
                                      inv_dc_edge;
             tr_flux -=
                 eddy_diff4 * grad_tr_del2_edge * mesh_scaling_del4(jedge);
