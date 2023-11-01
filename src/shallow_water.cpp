@@ -467,6 +467,44 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
       });
 }
 
+
+__global__ void compute_tmp_tr_del2_cell(Real* tmp_tr_del2_cell,
+                                         Real const * norm_tr_cell, 
+                                         Real const * h_mean_edge, 
+                                         Real const * mesh_scaling_del2, 
+                                         Real const * dc_edge, 
+                                         Real const * dv_edge, 
+                                         Int const * nedges_on_cell,
+                                         Int const * edges_on_cell,
+                                         Int const * cells_on_edge,
+                                         Int ntracers,
+                                         Int ncells,
+                                         Int nlayers) {
+  const Int l = blockIdx.z;
+  const Int icell = blockDim.y * blockIdx.y + threadIdx.y;
+  const Int k = threadIdx.x;
+
+  Real tr_del2 = -0;
+  for (Int j = 0; j < nedges_on_cell[icell]; ++j) {
+    Int jedge = edges_on_cell[icell * max_edges + j];
+
+    Int jcell0 = cells_on_edge[2 * jedge + 0];
+    Int jcell1 = cells_on_edge[2 * jedge + 1];
+
+    Real inv_dc_edge = 1._fp / dc_edge[jedge];
+    Real grad_tr_edge =
+        (norm_tr_cell[l * nlayers * ncells + jcell1 * nlayers + k] -
+         norm_tr_cell[l * nlayers * ncells + jcell0 * nlayers + k]) *
+        inv_dc_edge;
+
+    tr_del2 += dv_edge[jedge] * edge_sign_on_cell[icell * max_edges + j] *
+               h_mean_edge[jedge * nlayers + k] * mesh_scaling_del2[jedge] *
+               grad_tr_edge;
+  }
+  Real inv_area_cell = 1._fp / area_cell[icell];
+  tmp_tr_del2_cell[l * nlayers * ncells + icell * nlayers + k] = tr_del2 * inv_area_cell;
+}
+
 void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                                             RealConst3d tr_cell,
                                             RealConst2d vn_edge,
@@ -492,6 +530,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   if (eddy_diff4 > 0) {
     tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
                               m_mesh->m_nlayers);
+#if 0
     parallel_for(
         "compute_tmp_tr_del2_cell",
         SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
@@ -515,6 +554,24 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           Real inv_area_cell = 1._fp / area_cell(icell);
           tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
         });
+#else
+    dim3 threads(m_mesh->m_nlayers, 4)
+    dim3 blocks(1, m_mesh->m_ncells / 4, ntracers)
+    compute_tmp_tr_del2_cell<<<blocks,threads>>>(tmp_tr_del2_cell.data(),
+                                                 norm_tr_cell.data(), 
+                                                 h_mean_edge.data(), 
+                                                 mesh_scaling_del2.data(), 
+                                                 dc_edge.data(), 
+                                                 dv_edge.data(), 
+                                                 nedges_on_cell.data(),
+                                                 edges_on_cell.data(),
+                                                 cells_on_edge.data(),
+                                                 ntracers,
+                                                 m_mesh->m_ncells,
+                                                 m_mesh->m_nlayers);
+
+
+#endif
   }
 
   parallel_for(
