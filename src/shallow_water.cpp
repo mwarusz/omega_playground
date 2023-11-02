@@ -488,7 +488,7 @@ __global__ void compute_tmp_tr_del2_cell(Real* tmp_tr_del2_cell,
 
   Real tr_del2 = -0;
   for (Int j = 0; j < nedges_on_cell[icell]; ++j) {
-    Int jedge = edges_on_cell[icell * max_edges + j];
+    Int jedge = edges_on_cell[icell * maxedges + j];
 
     Int jcell0 = cells_on_edge[2 * jedge + 0];
     Int jcell1 = cells_on_edge[2 * jedge + 1];
@@ -499,7 +499,7 @@ __global__ void compute_tmp_tr_del2_cell(Real* tmp_tr_del2_cell,
          norm_tr_cell[l * nlayers * ncells + jcell0 * nlayers + k]) *
         inv_dc_edge;
 
-    tr_del2 += dv_edge[jedge] * edge_sign_on_cell[icell * max_edges + j] *
+    tr_del2 += dv_edge[jedge] * edge_sign_on_cell[icell * maxedges + j] *
                h_mean_edge[jedge * nlayers + k] * mesh_scaling_del2[jedge] *
                grad_tr_edge;
   }
