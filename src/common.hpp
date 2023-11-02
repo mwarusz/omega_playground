@@ -21,6 +21,12 @@ using yakl::c::Bounds;
 using yakl::c::parallel_for;
 using yakl::c::SimpleBounds;
 
+using yakl::c::parallel_outer;
+using yakl::c::parallel_inner;
+using yakl::LaunchConfig;
+using yakl::InnerConfig;
+
+
 using Real1d = yakl::Array<Real, 1, yakl::memDevice, yakl::styleC>;
 using Real2d = yakl::Array<Real, 2, yakl::memDevice, yakl::styleC>;
 using Real3d = yakl::Array<Real, 3, yakl::memDevice, yakl::styleC>;
