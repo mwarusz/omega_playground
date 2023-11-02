@@ -467,21 +467,12 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
       });
 }
 
-
-__global__ void compute_tmp_tr_del2_cell(Real* tmp_tr_del2_cell,
-                                         Real const * norm_tr_cell, 
-                                         Real const * h_mean_edge, 
-                                         Real const * mesh_scaling_del2, 
-                                         Real const * dc_edge, 
-                                         Real const * dv_edge, 
-                                         Real const * edge_sign_on_cell, 
-                                         Real const * area_cell, 
-                                         Int const * nedges_on_cell,
-                                         Int const * edges_on_cell,
-                                         Int const * cells_on_edge,
-                                         Int ntracers,
-                                         Int ncells,
-                                         Int nlayers) {
+__global__ void compute_tmp_tr_del2_cell(
+    Real *tmp_tr_del2_cell, Real const *norm_tr_cell, Real const *h_mean_edge,
+    Real const *mesh_scaling_del2, Real const *dc_edge, Real const *dv_edge,
+    Real const *edge_sign_on_cell, Real const *area_cell,
+    Int const *nedges_on_cell, Int const *edges_on_cell,
+    Int const *cells_on_edge, Int ntracers, Int ncells, Int nlayers) {
   const Int l = blockIdx.z;
   const Int icell = blockDim.y * blockIdx.y + threadIdx.y;
   const Int k = threadIdx.x;
@@ -504,7 +495,8 @@ __global__ void compute_tmp_tr_del2_cell(Real* tmp_tr_del2_cell,
                grad_tr_edge;
   }
   Real inv_area_cell = 1._fp / area_cell[icell];
-  tmp_tr_del2_cell[l * nlayers * ncells + icell * nlayers + k] = tr_del2 * inv_area_cell;
+  tmp_tr_del2_cell[l * nlayers * ncells + icell * nlayers + k] =
+      tr_del2 * inv_area_cell;
 }
 
 void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
@@ -532,48 +524,77 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   if (eddy_diff4 > 0) {
     tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
                               m_mesh->m_nlayers);
-#if 0
+#if 1
+    // parallel_for(
+    //     "compute_tmp_tr_del2_cell",
+    //     SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
+    //     YAKL_LAMBDA(Int l, Int icell, Int k) {
+    //       Real tr_del2 = -0;
+    //       for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+    //         Int jedge = edges_on_cell(icell, j);
+
+    //        Int jcell0 = cells_on_edge(jedge, 0);
+    //        Int jcell1 = cells_on_edge(jedge, 1);
+
+    //        Real inv_dc_edge = 1._fp / dc_edge(jedge);
+    //        Real grad_tr_edge =
+    //            (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
+    //            inv_dc_edge;
+
+    //        tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+    //                   h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
+    //                   grad_tr_edge;
+    //      }
+    //      Real inv_area_cell = 1._fp / area_cell(icell);
+    //      tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
+    //    });
+
+    const Int nlayers = m_mesh->m_nlayers;
+    constexpr Int layers_per_iter = 2;
+    Int layer_stride = nlayers / layers_per_iter;
     parallel_for(
         "compute_tmp_tr_del2_cell",
-        SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          Real tr_del2 = -0;
+        SimpleBounds<3>(ntracers, m_mesh->m_ncells, nlayers / layers_per_iter),
+        YAKL_LAMBDA(Int l, Int icell, Int ko) {
+          SArray<Real, 1, layers_per_iter> tr_del2;
+          for (Int ki = 0; ki < layers_per_iter; ++ki) {
+            tr_del2(ki) = 0._fp;
+          }
+
+#pragma unroll 3
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
 
-            Int jcell0 = cells_on_edge(jedge, 0);
-            Int jcell1 = cells_on_edge(jedge, 1);
+            const Int jedge = edges_on_cell(icell, j);
+            const Int jcell0 = cells_on_edge(jedge, 0);
+            const Int jcell1 = cells_on_edge(jedge, 1);
+            const Real inv_dc_edge = 1._fp / dc_edge(jedge);
 
-            Real inv_dc_edge = 1._fp / dc_edge(jedge);
-            Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
-                inv_dc_edge;
+            for (Int ki = 0; ki < layers_per_iter; ++ki) {
+              const Int k = ko + ki * layer_stride;
+              Real grad_tr_edge =
+                  (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
+                  inv_dc_edge;
 
-            tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
-                       grad_tr_edge;
+              tr_del2(ki) += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                             h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
+                             grad_tr_edge;
+            }
           }
           Real inv_area_cell = 1._fp / area_cell(icell);
-          tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
+          for (Int ki = 0; ki < layers_per_iter; ++ki) {
+            const Int k = ko + ki * layer_stride;
+            tmp_tr_del2_cell(l, icell, k) = tr_del2(ki) * inv_area_cell;
+          }
         });
 #else
     dim3 threads(m_mesh->m_nlayers, 4);
     dim3 blocks(1, m_mesh->m_ncells / 4, ntracers);
-    compute_tmp_tr_del2_cell<<<blocks,threads>>>(tmp_tr_del2_cell.data(),
-                                                 norm_tr_cell.data(), 
-                                                 h_mean_edge.data(), 
-                                                 mesh_scaling_del2.data(), 
-                                                 dc_edge.data(), 
-                                                 dv_edge.data(), 
-                                                 edge_sign_on_cell.data(), 
-                                                 area_cell.data(), 
-                                                 nedges_on_cell.data(),
-                                                 edges_on_cell.data(),
-                                                 cells_on_edge.data(),
-                                                 ntracers,
-                                                 m_mesh->m_ncells,
-                                                 m_mesh->m_nlayers);
-
+    compute_tmp_tr_del2_cell<<<blocks, threads>>>(
+        tmp_tr_del2_cell.data(), norm_tr_cell.data(), h_mean_edge.data(),
+        mesh_scaling_del2.data(), dc_edge.data(), dv_edge.data(),
+        edge_sign_on_cell.data(), area_cell.data(), nedges_on_cell.data(),
+        edges_on_cell.data(), cells_on_edge.data(), ntracers, m_mesh->m_ncells,
+        m_mesh->m_nlayers);
 
 #endif
   }
