@@ -340,6 +340,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
     YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
     YAKL_SCOPE(edge_sign_on_vertex, m_mesh->m_edge_sign_on_vertex);
 
+    yakl::timer_start("del2u_edge");
     parallel_for(
         "compute_del2u_edge",
         SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
@@ -361,7 +362,9 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
           del2u_edge(iedge, k) = del2u;
         });
+    yakl::timer_stop("del2u_edge");
 
+    yakl::timer_start("del2div_cell");
     parallel_for(
         "compute_del2div_cell",
         SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
@@ -376,7 +379,9 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           del2div *= inv_area_cell;
           del2div_cell(icell, k) = del2div;
         });
+    yakl::timer_stop("del2div_cell");
 
+    yakl::timer_start("del2rvort_vertex");
     parallel_for(
         "compute_del2rvort_vertex",
         SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
@@ -392,8 +397,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
           del2rvort_vertex(ivertex, k) = del2rvort;
         });
+    yakl::timer_stop("del2rvort_vertex");
   }
 
+  yakl::timer_start("vtend");
   parallel_for(
       "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int iedge, Int k) {
@@ -465,6 +472,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           vn_tend_edge(iedge, k) = vn_tend;
         }
       });
+    yakl::timer_stop("vtend");
 }
 
 __global__ void compute_tmp_tr_del2_cell(
@@ -661,7 +669,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
       "compute_tr_tend",
       SimpleBounds<3>(ntracers, m_mesh->m_ncells, nlayers / layers_per_iter),
       YAKL_LAMBDA(Int l, Int icell, Int ko) {
-        Sarray<Real, 1, layers_per_iter> tr_tend;
+        SArray<Real, 1, layers_per_iter> tr_tend;
 
         for (Int ki = 0; ki < layers_per_iter; ++ki) {
           tr_tend(ki) = 0._fp;
