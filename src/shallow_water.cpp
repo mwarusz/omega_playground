@@ -524,6 +524,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   if (eddy_diff4 > 0) {
     tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
                               m_mesh->m_nlayers);
+    yakl::timer_start("tr_del2");
 #if 1
     // parallel_for(
     //     "compute_tmp_tr_del2_cell",
@@ -597,8 +598,10 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
         m_mesh->m_nlayers);
 
 #endif
+  yakl::timer_stop("tr_del2");
   }
 
+  yakl::timer_start("tr_tend");
   parallel_for(
       "compute_tr_tend",
       SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
@@ -649,6 +652,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
         }
       });
+    yakl::timer_stop("tr_tend");
 }
 
 Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
