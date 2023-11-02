@@ -5,7 +5,6 @@
 namespace omega {
 
 struct MPASMesh {
-  static constexpr Int maxedges = 6;
 
   Int m_nlayers;
   Int m_ncells;
