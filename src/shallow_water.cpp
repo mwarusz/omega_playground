@@ -276,25 +276,32 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
 
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
-  parallel_for(
-      "compute_htend", SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
-        Real accum = -0;
-        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-          Int jedge = edges_on_cell(icell, j);
-          accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                   h_flux_edge(jedge, k) * vn_edge(jedge, k);
-        }
+  YAKL_SCOPE(nlayers, m_mesh->m_nlayers);
+  parallel_outer(
+      "compute_htend", SimpleBounds<1>(m_mesh->m_ncells),
+      YAKL_LAMBDA(Int icell, InnerHandler handler) {
+        parallel_inner(
+            nlayers,
+            [&](const Int k) {
+              Real accum = -0;
+              for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+                Int jedge = edges_on_cell(icell, j);
+                accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                         h_flux_edge(jedge, k) * vn_edge(jedge, k);
+              }
 
-        Real inv_area_cell = 1._fp / area_cell(icell);
-        if (add_mode == AddMode::increment) {
-          h_tend_cell(icell, k) += -accum * inv_area_cell;
-        }
+              Real inv_area_cell = 1._fp / area_cell(icell);
+              if (add_mode == AddMode::increment) {
+                h_tend_cell(icell, k) += -accum * inv_area_cell;
+              }
 
-        if (add_mode == AddMode::replace) {
-          h_tend_cell(icell, k) = -accum * inv_area_cell;
-        }
-      });
+              if (add_mode == AddMode::replace) {
+                h_tend_cell(icell, k) = -accum * inv_area_cell;
+              }
+            },
+            handler);
+      },
+      LaunchConfig<nlayers_max>());
 }
 
 void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
@@ -324,6 +331,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   // YAKL_SCOPE(drag_coeff, m_drag_coeff);
   YAKL_SCOPE(visc_del2, m_visc_del2);
   YAKL_SCOPE(visc_del4, m_visc_del4);
+  YAKL_SCOPE(nlayers, m_mesh->m_nlayers);
 
   Real2d del2u_edge, del2rvort_vertex, del2div_cell;
   if (visc_del4 > 0) {
@@ -340,131 +348,157 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
     YAKL_SCOPE(area_triangle, m_mesh->m_area_triangle);
     YAKL_SCOPE(edge_sign_on_vertex, m_mesh->m_edge_sign_on_vertex);
 
-    parallel_for(
-        "compute_del2u_edge",
-        SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int iedge, Int k) {
-          Int icell0 = cells_on_edge(iedge, 0);
-          Int icell1 = cells_on_edge(iedge, 1);
+    parallel_outer(
+        "compute_del2u_edge", m_mesh->m_nedges,
+        YAKL_LAMBDA(Int iedge, InnerHandler handler) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Int icell0 = cells_on_edge(iedge, 0);
+                Int icell1 = cells_on_edge(iedge, 1);
 
-          Int ivertex0 = vertices_on_edge(iedge, 0);
-          Int ivertex1 = vertices_on_edge(iedge, 1);
+                Int ivertex0 = vertices_on_edge(iedge, 0);
+                Int ivertex1 = vertices_on_edge(iedge, 1);
 
-          Real dc_edge_inv = 1._fp / dc_edge(iedge);
-          Real dv_edge_inv =
-              1._fp / std::max(dv_edge(iedge), 0.25_fp * dc_edge(iedge)); // huh
+                Real dc_edge_inv = 1._fp / dc_edge(iedge);
+                Real dv_edge_inv =
+                    1._fp /
+                    std::max(dv_edge(iedge), 0.25_fp * dc_edge(iedge)); // huh
 
-          Real del2u =
-              ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
-               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
-                   dv_edge_inv);
+                Real del2u =
+                    ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
+                     (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
+                         dv_edge_inv);
 
-          del2u_edge(iedge, k) = del2u;
-        });
+                del2u_edge(iedge, k) = del2u;
+              },
+              handler);
+        },
+        LaunchConfig<nlayers_max>());
 
-    parallel_for(
-        "compute_del2div_cell",
-        SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int icell, Int k) {
-          Real del2div = -0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
-            del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       del2u_edge(jedge, k);
-          }
-          Real inv_area_cell = 1._fp / area_cell(icell);
-          del2div *= inv_area_cell;
-          del2div_cell(icell, k) = del2div;
-        });
+    parallel_outer(
+        "compute_del2div_cell", m_mesh->m_ncells,
+        YAKL_LAMBDA(Int icell, InnerHandler handler) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Real del2div = -0;
+                for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+                  Int jedge = edges_on_cell(icell, j);
+                  del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                             del2u_edge(jedge, k);
+                }
+                Real inv_area_cell = 1._fp / area_cell(icell);
+                del2div *= inv_area_cell;
+                del2div_cell(icell, k) = del2div;
+              },
+              handler);
+        },
+        LaunchConfig<nlayers_max>());
 
-    parallel_for(
-        "compute_del2rvort_vertex",
-        SimpleBounds<2>(m_mesh->m_nvertices, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int ivertex, Int k) {
-          Real del2rvort = -0;
-          for (Int j = 0; j < 3; ++j) {
-            Int jedge = edges_on_vertex(ivertex, j);
-            del2rvort += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
-                         vn_edge(jedge, k);
-          }
-          Real inv_area_triangle = 1._fp / area_triangle(ivertex);
-          del2rvort *= inv_area_triangle;
+    parallel_outer(
+        "compute_del2rvort_vertex", m_mesh->m_nvertices,
+        YAKL_LAMBDA(Int ivertex, InnerHandler handler) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Real del2rvort = -0;
+                for (Int j = 0; j < 3; ++j) {
+                  Int jedge = edges_on_vertex(ivertex, j);
+                  del2rvort += dc_edge(jedge) *
+                               edge_sign_on_vertex(ivertex, j) *
+                               vn_edge(jedge, k);
+                }
+                Real inv_area_triangle = 1._fp / area_triangle(ivertex);
+                del2rvort *= inv_area_triangle;
 
-          del2rvort_vertex(ivertex, k) = del2rvort;
-        });
+                del2rvort_vertex(ivertex, k) = del2rvort;
+              },
+              handler);
+        },
+        LaunchConfig<nlayers_max>());
   }
 
-  parallel_for(
-      "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
-        Real vn_tend = -0;
+  parallel_outer(
+      "compute_vtend", m_mesh->m_nedges,
+      YAKL_LAMBDA(Int iedge, InnerHandler handler) {
+        parallel_inner(
+            nlayers,
+            [&](const Int k) {
+              Real vn_tend = -0;
 
-        Real qt = -0;
-        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
-          Int jedge = edges_on_edge(iedge, j);
+              Real qt = -0;
+              for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+                Int jedge = edges_on_edge(iedge, j);
 
-          Real norm_vort = (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
-                            norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
-                           0.5_fp;
+                Real norm_vort =
+                    (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
+                     norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
+                    0.5_fp;
 
-          qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
-                vn_edge(jedge, k) * norm_vort;
-        }
+                qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
+                      vn_edge(jedge, k) * norm_vort;
+              }
 
-        Int icell0 = cells_on_edge(iedge, 0);
-        Int icell1 = cells_on_edge(iedge, 1);
+              Int icell0 = cells_on_edge(iedge, 0);
+              Int icell1 = cells_on_edge(iedge, 1);
 
-        Real ke_cell0 = ke_cell(icell0, k);
-        Real ke_cell1 = ke_cell(icell1, k);
+              Real ke_cell0 = ke_cell(icell0, k);
+              Real ke_cell1 = ke_cell(icell1, k);
 
-        Real inv_dc_edge = 1._fp / dc_edge(iedge);
-        Real grad_B = (ke_cell1 - ke_cell0 +
-                       grav * (h_cell(icell1, k) - h_cell(icell0, k))) *
-                      inv_dc_edge;
+              Real inv_dc_edge = 1._fp / dc_edge(iedge);
+              Real grad_B = (ke_cell1 - ke_cell0 +
+                             grav * (h_cell(icell1, k) - h_cell(icell0, k))) *
+                            inv_dc_edge;
 
-        vn_tend = qt - grad_B;
+              vn_tend = qt - grad_B;
 
-        // Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
-        // Real drag_force = (k == (max_level_edge_top(iedge) - 1))
-        //                       ? -drag_coeff * std::sqrt(ke_cell0 + ke_cell1)
-        //                       *
-        //                             vn_edge(iedge, k) * inv_h_drag_edge
-        //                       : 0;
-        // vn_tend += drag_force;
+              // Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
+              // Real drag_force = (k == (max_level_edge_top(iedge) - 1))
+              //                       ? -drag_coeff * std::sqrt(ke_cell0 +
+              //                       ke_cell1)
+              //                       *
+              //                             vn_edge(iedge, k) * inv_h_drag_edge
+              //                       : 0;
+              // vn_tend += drag_force;
 
-        Real inv_dv_edge = 1._fp / dv_edge(iedge);
-        // viscosity
-        if (visc_del2 > 0) {
-          Int ivertex0 = vertices_on_edge(iedge, 0);
-          Int ivertex1 = vertices_on_edge(iedge, 1);
-          Real visc2 =
-              visc_del2 * mesh_scaling_del2(iedge) *
-              ((div_cell(icell1, k) - div_cell(icell0, k)) * inv_dc_edge -
-               (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
-                   inv_dv_edge);
-          vn_tend += visc2 * edge_mask(iedge, k);
-        }
+              Real inv_dv_edge = 1._fp / dv_edge(iedge);
+              // viscosity
+              if (visc_del2 > 0) {
+                Int ivertex0 = vertices_on_edge(iedge, 0);
+                Int ivertex1 = vertices_on_edge(iedge, 1);
+                Real visc2 =
+                    visc_del2 * mesh_scaling_del2(iedge) *
+                    ((div_cell(icell1, k) - div_cell(icell0, k)) * inv_dc_edge -
+                     (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
+                         inv_dv_edge);
+                vn_tend += visc2 * edge_mask(iedge, k);
+              }
 
-        // hyperviscosity
-        if (visc_del4 > 0) {
-          Int ivertex0 = vertices_on_edge(iedge, 0);
-          Int ivertex1 = vertices_on_edge(iedge, 1);
-          Real visc4 =
-              visc_del4 * mesh_scaling_del4(iedge) *
-              ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) *
-                   inv_dc_edge -
-               (del2rvort_vertex(ivertex1, k) - del2rvort_vertex(ivertex0, k)) *
-                   inv_dv_edge);
-          vn_tend -= visc4 * edge_mask(iedge, k);
-        }
+              // hyperviscosity
+              if (visc_del4 > 0) {
+                Int ivertex0 = vertices_on_edge(iedge, 0);
+                Int ivertex1 = vertices_on_edge(iedge, 1);
+                Real visc4 =
+                    visc_del4 * mesh_scaling_del4(iedge) *
+                    ((del2div_cell(icell1, k) - del2div_cell(icell0, k)) *
+                         inv_dc_edge -
+                     (del2rvort_vertex(ivertex1, k) -
+                      del2rvort_vertex(ivertex0, k)) *
+                         inv_dv_edge);
+                vn_tend -= visc4 * edge_mask(iedge, k);
+              }
 
-        if (add_mode == AddMode::increment) {
-          vn_tend_edge(iedge, k) += vn_tend;
-        }
-        if (add_mode == AddMode::replace) {
-          vn_tend_edge(iedge, k) = vn_tend;
-        }
-      });
+              if (add_mode == AddMode::increment) {
+                vn_tend_edge(iedge, k) += vn_tend;
+              }
+              if (add_mode == AddMode::replace) {
+                vn_tend_edge(iedge, k) = vn_tend;
+              }
+            },
+            handler);
+      },
+      LaunchConfig<nlayers_max>());
 }
 
 void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
@@ -487,86 +521,98 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   YAKL_SCOPE(ntracers, m_ntracers);
   YAKL_SCOPE(eddy_diff2, m_eddy_diff2);
   YAKL_SCOPE(eddy_diff4, m_eddy_diff4);
+  YAKL_SCOPE(nlayers, m_mesh->m_nlayers);
 
   Real3d tmp_tr_del2_cell;
   if (eddy_diff4 > 0) {
     tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
                               m_mesh->m_nlayers);
-    parallel_for(
-        "compute_tmp_tr_del2_cell",
-        SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
-        YAKL_LAMBDA(Int l, Int icell, Int k) {
-          Real tr_del2 = -0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
+    parallel_outer(
+        "compute_tmp_tr_del2_cell", SimpleBounds<2>(ntracers, m_mesh->m_ncells),
+        YAKL_LAMBDA(Int l, Int icell, InnerHandler handler) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Real tr_del2 = -0;
+                for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+                  Int jedge = edges_on_cell(icell, j);
 
-            Int jcell0 = cells_on_edge(jedge, 0);
-            Int jcell1 = cells_on_edge(jedge, 1);
+                  Int jcell0 = cells_on_edge(jedge, 0);
+                  Int jcell1 = cells_on_edge(jedge, 1);
 
-            Real inv_dc_edge = 1._fp / dc_edge(jedge);
-            Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
-                inv_dc_edge;
+                  Real inv_dc_edge = 1._fp / dc_edge(jedge);
+                  Real grad_tr_edge = (norm_tr_cell(l, jcell1, k) -
+                                       norm_tr_cell(l, jcell0, k)) *
+                                      inv_dc_edge;
 
-            tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
-                       grad_tr_edge;
-          }
-          Real inv_area_cell = 1._fp / area_cell(icell);
-          tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
-        });
+                  tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                             h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
+                             grad_tr_edge;
+                }
+                Real inv_area_cell = 1._fp / area_cell(icell);
+                tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
+              },
+              handler);
+        },
+        LaunchConfig<nlayers_max>());
   }
 
-  parallel_for(
-      "compute_tr_tend",
-      SimpleBounds<3>(ntracers, m_mesh->m_ncells, m_mesh->m_nlayers),
-      YAKL_LAMBDA(Int l, Int icell, Int k) {
-        Real tr_tend = -0;
+  parallel_outer(
+      "compute_tr_tend", SimpleBounds<2>(ntracers, m_mesh->m_ncells),
+      YAKL_LAMBDA(Int l, Int icell, InnerHandler handler) {
+        parallel_inner(
+            nlayers,
+            [&](const Int k) {
+              Real tr_tend = -0;
 
-        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-          Int jedge = edges_on_cell(icell, j);
+              for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+                Int jedge = edges_on_cell(icell, j);
 
-          Int jcell0 = cells_on_edge(jedge, 0);
-          Int jcell1 = cells_on_edge(jedge, 1);
+                Int jcell0 = cells_on_edge(jedge, 0);
+                Int jcell1 = cells_on_edge(jedge, 1);
 
-          Real norm_tr_edge =
-              (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) *
-              0.5_fp;
+                Real norm_tr_edge =
+                    (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) *
+                    0.5_fp;
 
-          // advection
-          Real tr_flux =
-              -h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
+                // advection
+                Real tr_flux =
+                    -h_flux_edge(jedge, k) * norm_tr_edge * vn_edge(jedge, k);
 
-          Real inv_dc_edge = 1._fp / dc_edge(jedge);
-          // diffusion
-          if (eddy_diff2 > 0) {
-            Real grad_tr_edge =
-                (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
-                inv_dc_edge;
-            tr_flux += eddy_diff2 * h_mean_edge(jedge, k) * grad_tr_edge;
-          }
+                Real inv_dc_edge = 1._fp / dc_edge(jedge);
+                // diffusion
+                if (eddy_diff2 > 0) {
+                  Real grad_tr_edge = (norm_tr_cell(l, jcell1, k) -
+                                       norm_tr_cell(l, jcell0, k)) *
+                                      inv_dc_edge;
+                  tr_flux += eddy_diff2 * h_mean_edge(jedge, k) * grad_tr_edge;
+                }
 
-          // hyperdiffusion
-          if (eddy_diff4 > 0) {
-            Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
-                                      tmp_tr_del2_cell(l, jcell0, k)) *
-                                     inv_dc_edge;
-            tr_flux -=
-                eddy_diff4 * grad_tr_del2_edge * mesh_scaling_del4(jedge);
-          }
+                // hyperdiffusion
+                if (eddy_diff4 > 0) {
+                  Real grad_tr_del2_edge = (tmp_tr_del2_cell(l, jcell1, k) -
+                                            tmp_tr_del2_cell(l, jcell0, k)) *
+                                           inv_dc_edge;
+                  tr_flux -=
+                      eddy_diff4 * grad_tr_del2_edge * mesh_scaling_del4(jedge);
+                }
 
-          tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
-        }
+                tr_tend +=
+                    dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
+              }
 
-        Real inv_area_cell = 1._fp / area_cell(icell);
-        if (add_mode == AddMode::increment) {
-          tr_tend_cell(l, icell, k) += tr_tend * inv_area_cell;
-        }
+              Real inv_area_cell = 1._fp / area_cell(icell);
+              if (add_mode == AddMode::increment) {
+                tr_tend_cell(l, icell, k) += tr_tend * inv_area_cell;
+              }
 
-        if (add_mode == AddMode::replace) {
-          tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
-        }
-      });
+              if (add_mode == AddMode::replace) {
+                tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
+              }
+            },
+            handler);
+      },
+      LaunchConfig<nlayers_max>());
 }
 
 Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
