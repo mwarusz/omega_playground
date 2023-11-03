@@ -22,6 +22,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   m_vertices_on_cell = Int2d("vertices_on_cell", m_ncells, maxedges);
 
   m_area_cell = Real1d("area_cell", m_ncells);
+  m_inv_area_cell = Real1d("inv_area_cell", m_ncells);
   m_lat_cell = Real1d("lat_cell", m_ncells);
   m_lon_cell = Real1d("lon_cell", m_ncells);
   m_x_cell = Real1d("x_cell", m_ncells);
@@ -36,7 +37,9 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   m_edges_on_edge = Int2d("edges_on_edge", m_nedges, 2 * maxedges);
 
   m_dc_edge = Real1d("dc_edge", m_nedges);
+  m_inv_dc_edge = Real1d("inv_dc_edge", m_nedges);
   m_dv_edge = Real1d("dv_edge", m_nedges);
+  m_inv_dv_edge = Real1d("inv_dv_edge", m_nedges);
   m_angle_edge = Real1d("angle_edge", m_nedges);
   m_lat_edge = Real1d("lat_edge", m_nedges);
   m_lon_edge = Real1d("lon_edge", m_nedges);
@@ -50,6 +53,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   m_cells_on_vertex = Int2d("cells_on_vertex", m_nvertices, 3);
 
   m_area_triangle = Real1d("area_triangle", m_nvertices);
+  m_inv_area_triangle = Real1d("inv_area_triangle", m_nvertices);
   m_lat_vertex = Real1d("lat_vertex", m_nvertices);
   m_lon_vertex = Real1d("lon_vertex", m_nvertices);
   m_x_vertex = Real1d("x_vertex", m_nvertices);
@@ -326,6 +330,7 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
       YAKL_CLASS_LAMBDA(Int irow, Int icol) {
         Int icell = cellidx(icol, irow);
         m_area_cell(icell) = m_dc * m_dc * sqrt(3) / 2;
+        m_inv_area_cell(icell) = 1._fp / m_area_cell(icell);
         m_lat_cell(icell) = 0;
         m_lon_cell(icell) = 0;
 
@@ -374,7 +379,9 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
       "compute_edge_arrays", m_nedges, YAKL_CLASS_LAMBDA(Int iedge) {
         m_nedges_on_edge(iedge) = 10;
         m_dc_edge(iedge) = m_dc;
+        m_inv_dc_edge(iedge) = 1._fp / m_dc;
         m_dv_edge(iedge) = m_dc_edge(iedge) * sqrt(3) / 3;
+        m_inv_dv_edge(iedge) = 1._fp / m_dv_edge(iedge);
         m_lat_edge(iedge) = 0;
         m_lon_edge(iedge) = 0;
       });
@@ -384,6 +391,7 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         m_lat_vertex(ivertex) = 0;
         m_lon_vertex(ivertex) = 0;
         m_area_triangle(ivertex) = m_dc * m_dc * sqrt(3) / 4;
+        m_inv_area_triangle(ivertex) = 1._fp / m_area_triangle(ivertex);
         for (Int j = 0; j < 3; ++j) {
           m_kiteareas_on_vertex(ivertex, j) = m_dc * m_dc * sqrt(3) / 12;
         }

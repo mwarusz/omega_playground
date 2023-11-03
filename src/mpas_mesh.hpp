@@ -21,6 +21,7 @@ struct MPASMesh {
   Int1d m_max_level_cell;
 
   Real1d m_area_cell;
+  Real1d m_inv_area_cell;
   Real1d m_lat_cell;
   Real1d m_lon_cell;
   Real1d m_x_cell;
@@ -38,7 +39,9 @@ struct MPASMesh {
   Int1d m_max_level_edge_top;
 
   Real1d m_dc_edge;
+  Real1d m_inv_dc_edge;
   Real1d m_dv_edge;
+  Real1d m_inv_dv_edge;
   Real1d m_angle_edge;
   Real1d m_lat_edge;
   Real1d m_lon_edge;
@@ -58,6 +61,7 @@ struct MPASMesh {
   Int1d m_max_level_vertex_top;
 
   Real1d m_area_triangle;
+  Real1d m_inv_area_triangle;
   Real1d m_lat_vertex;
   Real1d m_lon_vertex;
   Real1d m_x_vertex;
