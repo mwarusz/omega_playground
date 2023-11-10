@@ -177,7 +177,8 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
         for (Int l = 0; l < ntracers; ++l) {
           norm_tr_cell(l, icell, k) = tr_cell(l, icell, k) * inv_h;
         }
-      });
+      },
+      LaunchConfig<block_size>());
 }
 
 void ShallowWaterModel::compute_vertex_auxiliary_variables(
@@ -218,7 +219,8 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
         rvort_vertex(ivertex, k) = rvort;
         norm_rvort_vertex(ivertex, k) = rvort * inv_h;
         norm_f_vertex(ivertex, k) = f_vertex(ivertex) * inv_h;
-      });
+      },
+      LaunchConfig<block_size>());
 }
 
 void ShallowWaterModel::compute_edge_auxiliary_variables(
@@ -262,7 +264,8 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
 
         norm_rvort_edge(iedge, k) = norm_rvort;
         norm_f_edge(iedge, k) = norm_f;
-      });
+      },
+      LaunchConfig<block_size>());
 }
 
 void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
@@ -294,7 +297,8 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
         if (add_mode == AddMode::replace) {
           h_tend_cell(icell, k) = -accum * inv_area_cell;
         }
-      });
+      },
+      LaunchConfig<block_size>());
 }
 
 void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
@@ -360,7 +364,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                    dv_edge_inv);
 
           del2u_edge(iedge, k) = del2u;
-        });
+        },
+        LaunchConfig<block_size>());
 
     parallel_for(
         "compute_del2div_cell",
@@ -375,7 +380,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           Real inv_area_cell = 1._fp / area_cell(icell);
           del2div *= inv_area_cell;
           del2div_cell(icell, k) = del2div;
-        });
+        },
+        LaunchConfig<block_size>());
 
     parallel_for(
         "compute_del2rvort_vertex",
@@ -391,7 +397,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           del2rvort *= inv_area_triangle;
 
           del2rvort_vertex(ivertex, k) = del2rvort;
-        });
+        },
+        LaunchConfig<block_size>());
   }
 
   parallel_for(
@@ -464,7 +471,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         if (add_mode == AddMode::replace) {
           vn_tend_edge(iedge, k) = vn_tend;
         }
-      });
+      },
+      LaunchConfig<block_size>());
 }
 
 void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
@@ -514,7 +522,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
           }
           Real inv_area_cell = 1._fp / area_cell(icell);
           tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
-        });
+        },
+        LaunchConfig<block_size>());
   }
 
   parallel_for(
@@ -566,7 +575,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
         if (add_mode == AddMode::replace) {
           tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
         }
-      });
+      },
+      LaunchConfig<block_size>());
 }
 
 Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
