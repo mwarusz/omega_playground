@@ -303,6 +303,8 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
             nlayers,
             [&](const Int k) {
               Real accum = -0;
+
+#pragma unroll 5
               for (Int j = 0; j < nedges_on_cell(icell); ++j) {
                 Int jedge = edges_on_cell(icell, j);
                 accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
@@ -402,6 +404,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
               nlayers,
               [&](const Int k) {
                 Real del2div = -0;
+#pragma unroll 5
                 for (Int j = 0; j < nedges_on_cell(icell); ++j) {
                   Int jedge = edges_on_cell(icell, j);
                   del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
@@ -447,6 +450,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
               Real vn_tend = -0;
 
               Real qt = -0;
+#pragma unroll 5
               for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
                 Int jedge = edges_on_edge(iedge, j);
 
@@ -553,6 +557,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
               nlayers,
               [&](const Int k) {
                 Real tr_del2 = -0;
+#pragma unroll 5
                 for (Int j = 0; j < nedges_on_cell(icell); ++j) {
                   Int jedge = edges_on_cell(icell, j);
 
@@ -584,6 +589,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
             [&](const Int k) {
               Real tr_tend = -0;
 
+#pragma unroll 5
               for (Int j = 0; j < nedges_on_cell(icell); ++j) {
                 Int jedge = edges_on_cell(icell, j);
 
