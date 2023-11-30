@@ -14,6 +14,23 @@ constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
 
 constexpr Int nlayers_max = 64;
 
+#if defined YAKL_ARCH_CUDA || defined YAKL_ARCH_HIP || defined YAKL_ARCH_SYCL
+template <class T> struct LayerScratch {
+  T m_data;
+
+  const T &operator()(Int k) const { return m_data; }
+  T &operator()(Int k) { return m_data; }
+};
+#else
+template <class T> struct LayerScratch {
+  T m_data[nlayers_max];
+
+  const T &operator()(Int k) const { return m_data[k]; }
+
+  T &operator()(Int k) { return m_data[k]; }
+};
+#endif
+
 constexpr Real pi = M_PI;
 
 using yakl::SArray;

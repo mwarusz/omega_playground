@@ -157,26 +157,30 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
   parallel_outer(
       "compute_cell_auxiliarys", m_mesh->m_ncells,
       YAKL_LAMBDA(Int icell, InnerHandler handler) {
+        LayerScratch<Real> ke{};
+        LayerScratch<Real> div{};
+
+#pragma unroll 5
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Int jedge = edges_on_cell(icell, j);
+                Real area_edge = dv_edge(jedge) * dc_edge(jedge);
+                ke(k) +=
+                    area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) * 0.25_fp;
+                div(k) += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                          vn_edge(jedge, k);
+              },
+              handler);
+        }
+
+        Real inv_area_cell = 1._fp / area_cell(icell);
         parallel_inner(
             nlayers,
             [&](const Int k) {
-              Real ke = -0;
-              Real div = -0;
-              for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-                Int jedge = edges_on_cell(icell, j);
-                Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-                ke +=
-                    area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) * 0.25_fp;
-                div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                       vn_edge(jedge, k);
-              }
-              Real inv_area_cell = 1._fp / area_cell(icell);
-              ke *= inv_area_cell;
-              div *= inv_area_cell;
-
-              div_cell(icell, k) = div;
-              ke_cell(icell, k) = ke;
-
+              div_cell(icell, k) = div(k) * inv_area_cell;
+              ke_cell(icell, k) = ke(k) * inv_area_cell;
               Real inv_h = 1._fp / h_cell(icell, k);
               for (Int l = 0; l < ntracers; ++l) {
                 norm_tr_cell(l, icell, k) = tr_cell(l, icell, k) * inv_h;
@@ -205,26 +209,29 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
   parallel_outer(
       "compute_vertex_auxiliarys", m_mesh->m_nvertices,
       YAKL_LAMBDA(Int ivertex, InnerHandler handler) {
+        LayerScratch<Real> h{};
+        LayerScratch<Real> rcirc{};
+
+        for (Int j = 0; j < 3; ++j) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Int jedge = edges_on_vertex(ivertex, j);
+                rcirc(k) += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
+                            vn_edge(jedge, k);
+                Int jcell = cells_on_vertex(ivertex, j);
+                h(k) += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
+              },
+              handler);
+        }
+
+        Real inv_area_triangle = 1._fp / area_triangle(ivertex);
         parallel_inner(
             nlayers,
             [&](const Int k) {
-              Real inv_area_triangle = 1._fp / area_triangle(ivertex);
-              Real rcirc = -0;
-              for (Int j = 0; j < 3; ++j) {
-                Int jedge = edges_on_vertex(ivertex, j);
-                rcirc += dc_edge(jedge) * edge_sign_on_vertex(ivertex, j) *
-                         vn_edge(jedge, k);
-              }
-              Real rvort = rcirc * inv_area_triangle;
-
-              Real h = -0;
-              for (Int j = 0; j < 3; ++j) {
-                Int jcell = cells_on_vertex(ivertex, j);
-                h += kiteareas_on_vertex(ivertex, j) * h_cell(jcell, k);
-              }
-              h *= inv_area_triangle;
-              Real inv_h = 1._fp / h;
-
+              Real rvort = rcirc(k) * inv_area_triangle;
+              Real htmp = h(k) * inv_area_triangle;
+              Real inv_h = 1._fp / htmp;
               rvort_vertex(ivertex, k) = rvort;
               norm_rvort_vertex(ivertex, k) = rvort * inv_h;
               norm_f_vertex(ivertex, k) = f_vertex(ivertex) * inv_h;
@@ -299,25 +306,31 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   parallel_outer(
       "compute_htend", SimpleBounds<1>(m_mesh->m_ncells),
       YAKL_LAMBDA(Int icell, InnerHandler handler) {
+        LayerScratch<Real> accum{};
+
+#pragma unroll 5
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Int jedge = edges_on_cell(icell, j);
+                accum(k) += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                            h_flux_edge(jedge, k) * vn_edge(jedge, k);
+              },
+              handler);
+        }
+
+        Real inv_area_cell = 1._fp / area_cell(icell);
+
         parallel_inner(
             nlayers,
             [&](const Int k) {
-              Real accum = -0;
-
-#pragma unroll 5
-              for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-                Int jedge = edges_on_cell(icell, j);
-                accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                         h_flux_edge(jedge, k) * vn_edge(jedge, k);
-              }
-
-              Real inv_area_cell = 1._fp / area_cell(icell);
               if (add_mode == AddMode::increment) {
-                h_tend_cell(icell, k) += -accum * inv_area_cell;
+                h_tend_cell(icell, k) += -accum(k) * inv_area_cell;
               }
 
               if (add_mode == AddMode::replace) {
-                h_tend_cell(icell, k) = -accum * inv_area_cell;
+                h_tend_cell(icell, k) = -accum(k) * inv_area_cell;
               }
             },
             handler);
@@ -400,19 +413,25 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
     parallel_outer(
         "compute_del2div_cell", m_mesh->m_ncells,
         YAKL_LAMBDA(Int icell, InnerHandler handler) {
+          LayerScratch<Real> del2div{};
+
+#pragma unroll 5
+          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+            parallel_inner(
+                nlayers,
+                [&](const Int k) {
+                  Int jedge = edges_on_cell(icell, j);
+                  del2div(k) += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                                del2u_edge(jedge, k);
+                },
+                handler);
+          }
+
           parallel_inner(
               nlayers,
               [&](const Int k) {
-                Real del2div = -0;
-#pragma unroll 5
-                for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-                  Int jedge = edges_on_cell(icell, j);
-                  del2div += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                             del2u_edge(jedge, k);
-                }
                 Real inv_area_cell = 1._fp / area_cell(icell);
-                del2div *= inv_area_cell;
-                del2div_cell(icell, k) = del2div;
+                del2div_cell(icell, k) = del2div(k) * inv_area_cell;
               },
               handler);
         },
@@ -421,20 +440,26 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
     parallel_outer(
         "compute_del2rvort_vertex", m_mesh->m_nvertices,
         YAKL_LAMBDA(Int ivertex, InnerHandler handler) {
+          LayerScratch<Real> del2rvort{};
+
+          for (Int j = 0; j < 3; ++j) {
+            Int jedge = edges_on_vertex(ivertex, j);
+            parallel_inner(
+                nlayers,
+                [&](const Int k) {
+                  del2rvort(k) += dc_edge(jedge) *
+                                  edge_sign_on_vertex(ivertex, j) *
+                                  vn_edge(jedge, k);
+                },
+                handler);
+          }
+
+          Real inv_area_triangle = 1._fp / area_triangle(ivertex);
+
           parallel_inner(
               nlayers,
               [&](const Int k) {
-                Real del2rvort = -0;
-                for (Int j = 0; j < 3; ++j) {
-                  Int jedge = edges_on_vertex(ivertex, j);
-                  del2rvort += dc_edge(jedge) *
-                               edge_sign_on_vertex(ivertex, j) *
-                               vn_edge(jedge, k);
-                }
-                Real inv_area_triangle = 1._fp / area_triangle(ivertex);
-                del2rvort *= inv_area_triangle;
-
-                del2rvort_vertex(ivertex, k) = del2rvort;
+                del2rvort_vertex(ivertex, k) = del2rvort(k) * inv_area_triangle;
               },
               handler);
         },
@@ -444,24 +469,28 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   parallel_outer(
       "compute_vtend", m_mesh->m_nedges,
       YAKL_LAMBDA(Int iedge, InnerHandler handler) {
-        parallel_inner(
-            nlayers,
-            [&](const Int k) {
-              Real vn_tend = -0;
+        LayerScratch<Real> qt{};
 
-              Real qt = -0;
-#pragma unroll 5
-              for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                Real vn_tend = -0;
                 Int jedge = edges_on_edge(iedge, j);
-
                 Real norm_vort =
                     (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
                      norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
                     0.5_fp;
+                qt(k) += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
+                         vn_edge(jedge, k) * norm_vort;
+              },
+              handler);
+        }
 
-                qt += weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
-                      vn_edge(jedge, k) * norm_vort;
-              }
+        parallel_inner(
+            nlayers,
+            [&](const Int k) {
+              Real vn_tend = -0;
 
               Int icell0 = cells_on_edge(iedge, 0);
               Int icell1 = cells_on_edge(iedge, 1);
@@ -474,7 +503,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                              grav * (h_cell(icell1, k) - h_cell(icell0, k))) *
                             inv_dc_edge;
 
-              vn_tend = qt - grad_B;
+              vn_tend = qt(k) - grad_B;
 
               // Real inv_h_drag_edge = 1._fp / h_drag_edge(iedge, k);
               // Real drag_force = (k == (max_level_edge_top(iedge) - 1))
@@ -553,14 +582,14 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
     parallel_outer(
         "compute_tmp_tr_del2_cell", SimpleBounds<2>(ntracers, m_mesh->m_ncells),
         YAKL_LAMBDA(Int l, Int icell, InnerHandler handler) {
-          parallel_inner(
-              nlayers,
-              [&](const Int k) {
-                Real tr_del2 = -0;
-#pragma unroll 5
-                for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-                  Int jedge = edges_on_cell(icell, j);
+          LayerScratch<Real> tr_del2{};
 
+#pragma unroll 5
+          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+            parallel_inner(
+                nlayers,
+                [&](const Int k) {
+                  Int jedge = edges_on_cell(icell, j);
                   Int jcell0 = cells_on_edge(jedge, 0);
                   Int jcell1 = cells_on_edge(jedge, 1);
 
@@ -569,12 +598,19 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                                        norm_tr_cell(l, jcell0, k)) *
                                       inv_dc_edge;
 
-                  tr_del2 += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                             h_mean_edge(jedge, k) * mesh_scaling_del2(jedge) *
-                             grad_tr_edge;
-                }
-                Real inv_area_cell = 1._fp / area_cell(icell);
-                tmp_tr_del2_cell(l, icell, k) = tr_del2 * inv_area_cell;
+                  tr_del2(k) += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
+                                h_mean_edge(jedge, k) *
+                                mesh_scaling_del2(jedge) * grad_tr_edge;
+                },
+                handler);
+          }
+
+          Real inv_area_cell = 1._fp / area_cell(icell);
+
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
+                tmp_tr_del2_cell(l, icell, k) = tr_del2(k) * inv_area_cell;
               },
               handler);
         },
@@ -584,13 +620,13 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   parallel_outer(
       "compute_tr_tend", SimpleBounds<2>(ntracers, m_mesh->m_ncells),
       YAKL_LAMBDA(Int l, Int icell, InnerHandler handler) {
-        parallel_inner(
-            nlayers,
-            [&](const Int k) {
-              Real tr_tend = -0;
+        LayerScratch<Real> tr_tend{};
 
 #pragma unroll 5
-              for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
+          parallel_inner(
+              nlayers,
+              [&](const Int k) {
                 Int jedge = edges_on_cell(icell, j);
 
                 Int jcell0 = cells_on_edge(jedge, 0);
@@ -622,17 +658,22 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                       eddy_diff4 * grad_tr_del2_edge * mesh_scaling_del4(jedge);
                 }
 
-                tr_tend +=
+                tr_tend(k) +=
                     dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
-              }
+              },
+              handler);
+        }
 
-              Real inv_area_cell = 1._fp / area_cell(icell);
+        Real inv_area_cell = 1._fp / area_cell(icell);
+        parallel_inner(
+            nlayers,
+            [&](const Int k) {
               if (add_mode == AddMode::increment) {
-                tr_tend_cell(l, icell, k) += tr_tend * inv_area_cell;
+                tr_tend_cell(l, icell, k) += tr_tend(k) * inv_area_cell;
               }
 
               if (add_mode == AddMode::replace) {
-                tr_tend_cell(l, icell, k) = tr_tend * inv_area_cell;
+                tr_tend_cell(l, icell, k) = tr_tend(k) * inv_area_cell;
               }
             },
             handler);
