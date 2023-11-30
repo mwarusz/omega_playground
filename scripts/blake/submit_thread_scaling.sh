@@ -9,12 +9,9 @@
 #SBATCH --time=02:00:00
 #SBATCH --output=job-omega-thread-scaling-%j.log
 
-outdir=${1:-"frontier_thread_scaling"}
+outdir=${1:-"blake_thread_scaling"}
 script_path=$(scontrol show job "$SLURM_JOB_ID" | awk -F= '/Command=/{print $2}')
 script_dir=$(dirname $script_path)
-
-outdir="blake_results"
-mkdir -p $outdir && cd $outdir
 
 threads="1 2 4 8 16 24 32 40 48 56 64 72 80 88 96"
 nvertlevels=64
