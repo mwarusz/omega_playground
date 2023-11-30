@@ -5,7 +5,7 @@
 #PBS -l nodes=1:ppn=208
 #PBS -q workq
 #PBS -l walltime=01:00:00
-#PBS -o job-omega-thread-scaling-%j.log
+#PBS -o job-omega-thread-scaling-$PBS_JOBID.log
 
 cd $PBS_O_WORKDIR
 
