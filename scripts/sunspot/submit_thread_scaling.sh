@@ -24,7 +24,7 @@ nsteps=$nsteps_base
 for l in {1..5}
 do
   echo "$ncellsx $nsteps"
-  $script_dir/../run_thread_scaling.sh $ncellsx $nvertlevels $ntracers $nsteps "$threads" $outdir 
+  $script_dir/run_thread_scaling.sh $ncellsx $nvertlevels $ntracers $nsteps "$threads" $outdir 
   ncellsx=$((2*$ncellsx))
   nsteps=$(($nsteps/4))
 done
