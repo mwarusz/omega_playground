@@ -279,23 +279,18 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
 
   YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
+
+  DivergenceCell div(m_mesh);
   parallel_for(
       "compute_htend", SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
       YAKL_LAMBDA(Int icell, Int k) {
-        Real accum = -0;
-        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-          Int jedge = edges_on_cell(icell, j);
-          accum += dv_edge(jedge) * edge_sign_on_cell(icell, j) *
-                   h_flux_edge(jedge, k) * vn_edge(jedge, k);
-        }
-
-        Real inv_area_cell = 1._fp / area_cell(icell);
+        Real flux_div = div(icell, k, vn_edge, h_flux_edge);
         if (add_mode == AddMode::increment) {
-          h_tend_cell(icell, k) += -accum * inv_area_cell;
+          h_tend_cell(icell, k) += -flux_div;
         }
 
         if (add_mode == AddMode::replace) {
-          h_tend_cell(icell, k) = -accum * inv_area_cell;
+          h_tend_cell(icell, k) = -flux_div;
         }
       },
       LaunchConfig<block_size>());

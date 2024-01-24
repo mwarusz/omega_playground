@@ -132,4 +132,45 @@ struct LinearShallowWaterModel : ShallowWaterModelBase {
   LinearShallowWaterModel(MPASMesh *mesh,
                           const LinearShallowWaterParams &params);
 };
+
+class DivergenceCell {
+  Int1d m_nedges_on_cell;
+  Int2d m_edges_on_cell;
+  Real2d m_edge_sign_on_cell;
+  Real1d m_dv_edge;
+  Real1d m_area_cell;
+
+  public:
+
+  YAKL_INLINE Real operator()(Int icell, Int k,
+                              const RealConst2d &v_edge) const {
+    Real accum = 0;
+    for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
+      Int jedge = m_edges_on_cell(icell, j);
+      accum += m_dv_edge(jedge) * m_edge_sign_on_cell(icell, j) * v_edge(jedge, k);
+    }
+    Real inv_area_cell = 1._fp / m_area_cell(icell);
+    return accum * inv_area_cell;
+  }
+  
+  YAKL_INLINE Real operator()(Int icell, Int k,
+                              const RealConst2d &v_edge,
+                              const RealConst2d &h_edge) const {
+    Real accum = 0;
+    for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
+      Int jedge = m_edges_on_cell(icell, j);
+      accum += m_dv_edge(jedge) * m_edge_sign_on_cell(icell, j) * h_edge(jedge, k) * v_edge(jedge, k);
+    }
+    Real inv_area_cell = 1._fp / m_area_cell(icell);
+    return accum * inv_area_cell;
+  }
+
+  DivergenceCell(const MPASMesh *mesh) :
+    m_nedges_on_cell(mesh->m_nedges_on_cell),
+    m_edges_on_cell(mesh->m_edges_on_cell),
+    m_edge_sign_on_cell(mesh->m_edge_sign_on_cell),
+    m_dv_edge(mesh->m_dv_edge),
+    m_area_cell(mesh->m_area_cell) {
+  }
+};
 } // namespace omega
