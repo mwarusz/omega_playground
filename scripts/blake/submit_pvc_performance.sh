@@ -1,20 +1,16 @@
 #!/bin/bash
 
-#SBATCH --account=CLI115
-#SBATCH --job-name=omega-performance
+#SBATCH --job-name=omega-pvc-performance
 #SBATCH --nodes=1
-#SBATCH --partition=batch
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=1
+#SBATCH --partition=PV
 #SBATCH --time=01:00:00
-#SBATCH --output=job-omega-performance-%j.log
+#SBATCH --output=job-omega-pvc-performance-%j.log
 
+outfile=${1:-"blake-pvc-performance.txt"}
 script_path=$(scontrol show job "$SLURM_JOB_ID" | awk -F= '/Command=/{print $2}')
 script_dir=$(dirname $script_path)
-
-outfile=${1:-"frontier_performance"}
-
-export OMP_NUM_THREADS=56
-export OMP_PLACES="threads"
-export OMP_PROC_BIND="spread"
 
 nvertlevels=64
 ntracers=1

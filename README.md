@@ -1,12 +1,11 @@
 # Building
 
-For building the code there is a helper script `prepare_build.sh`. It takes one argument, which is the name of the machine
-for which you are building. If this argument is not provided it will default to a local serial build. For example, to build
-on Frontier for the MI250X GPU do:
+Example of gpu build on Frontier
 ```
-mdkir build
+mkdir build
 cd build
-source ../prepare_build.sh frontier-gpu
+source ../machines/frontier-gpu.env
+cmake .. -C ../machines/frontier-gpu.cmake
 make -j8
 ```
 
