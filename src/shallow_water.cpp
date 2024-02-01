@@ -214,8 +214,9 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
   YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
   YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
   YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
-  YAKL_SCOPE(norm_rvort_vertex, m_norm_rvort_vertex);
-  YAKL_SCOPE(norm_f_vertex, m_norm_f_vertex);
+
+  RealConst2d norm_rvort_vertex = m_norm_rvort_vertex;
+  RealConst2d norm_f_vertex = m_norm_f_vertex;
 
   CellAverageEdge cell_avg{m_mesh};
   VertexAverageEdge vert_avg{m_mesh};
@@ -248,7 +249,7 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   YAKL_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
   YAKL_SCOPE(area_cell, m_mesh->m_area_cell);
 
-  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
+  const RealConst2d &h_flux_edge = m_h_flux_edge;
 
   DivergenceCell div(m_mesh);
   parallel_for(
@@ -283,14 +284,15 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   YAKL_SCOPE(mesh_scaling_del4, m_mesh->m_mesh_scaling_del4);
 
   YAKL_SCOPE(grav, m_grav);
-  YAKL_SCOPE(norm_rvort_edge, m_norm_rvort_edge);
-  YAKL_SCOPE(norm_f_edge, m_norm_f_edge);
-  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
-  // YAKL_SCOPE(h_drag_edge, m_h_drag_edge);
-  YAKL_SCOPE(ke_cell, m_ke_cell);
-  YAKL_SCOPE(div_cell, m_div_cell);
-  YAKL_SCOPE(rvort_vertex, m_rvort_vertex);
-  // YAKL_SCOPE(drag_coeff, m_drag_coeff);
+
+  RealConst2d norm_rvort_edge = m_norm_rvort_edge;
+  RealConst2d norm_f_edge = m_norm_f_edge;
+  RealConst2d h_flux_edge = m_h_flux_edge;
+
+  RealConst2d ke_cell = m_ke_cell;
+  RealConst2d div_cell = m_div_cell;
+  RealConst2d rvort_vertex = m_rvort_vertex;
+
   YAKL_SCOPE(visc_del2, m_visc_del2);
   YAKL_SCOPE(visc_del4, m_visc_del4);
 
@@ -341,6 +343,9 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   Del2UEdge del2u(m_mesh);
   QTermEdge qterm(m_mesh);
   GradEdge grad(m_mesh);
+  
+  RealConst2d del2rvort_vertex_const  = del2rvort_vertex;
+  RealConst2d del2div_cell_const      = del2div_cell;
 
   parallel_for(
       "compute_vtend", SimpleBounds<2>(m_mesh->m_nedges, m_mesh->m_nlayers),
@@ -363,7 +368,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         // hyperviscosity
         if (visc_del4 > 0) {
           Real visc4 =
-              visc_del4 * mesh_scaling_del4(iedge) * del2u(iedge, k, del2div_cell, del2rvort_vertex, Del2Std{});
+              visc_del4 * mesh_scaling_del4(iedge) * del2u(iedge, k, del2div_cell_const, del2rvort_vertex_const, Del2Std{});
           vn_tend -= visc4 * edge_mask(iedge, k);
         }
 
@@ -391,9 +396,9 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   YAKL_SCOPE(mesh_scaling_del2, m_mesh->m_mesh_scaling_del2);
   YAKL_SCOPE(mesh_scaling_del4, m_mesh->m_mesh_scaling_del4);
 
-  YAKL_SCOPE(h_flux_edge, m_h_flux_edge);
-  YAKL_SCOPE(h_mean_edge, m_h_mean_edge);
-  YAKL_SCOPE(norm_tr_cell, m_norm_tr_cell);
+  RealConst2d h_flux_edge = m_h_flux_edge;
+  RealConst2d h_mean_edge = m_h_mean_edge;
+  RealConst3d norm_tr_cell = m_norm_tr_cell;
   YAKL_SCOPE(ntracers, m_ntracers);
   YAKL_SCOPE(eddy_diff2, m_eddy_diff2);
   YAKL_SCOPE(eddy_diff4, m_eddy_diff4);
@@ -417,6 +422,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   TracerAdvFluxEdge tr_adv_flux{m_mesh};
   TracerDel2FluxEdge tr_del2_flux{m_mesh};
   TracerDel4FluxEdge tr_del4_flux{m_mesh};
+  
+  RealConst3d tmp_tr_del2_cell_const = tmp_tr_del2_cell;
 
   parallel_for(
       "compute_tr_tend",
@@ -437,7 +444,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
 
           // hyperdiffusion
           if (eddy_diff4 > 0) {
-            tr_flux += tr_del4_flux(l, jedge, k, tmp_tr_del2_cell, eddy_diff4);
+            tr_flux += tr_del4_flux(l, jedge, k, tmp_tr_del2_cell_const, eddy_diff4);
           }
 
           tr_tend += dv_edge(jedge) * edge_sign_on_cell(icell, j) * tr_flux;
