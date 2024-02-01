@@ -322,11 +322,12 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         LaunchConfig<block_size>());
 
     DivergenceCell div(m_mesh);
+    RealConst2d del2u_edge_const  = del2u_edge;
     parallel_for(
         "compute_del2div_cell",
         SimpleBounds<2>(m_mesh->m_ncells, m_mesh->m_nlayers),
         YAKL_LAMBDA(Int icell, Int k) {
-          del2div_cell(icell, k) = div(icell, k, del2u_edge);
+          del2div_cell(icell, k) = div(icell, k, del2u_edge_const);
         },
         LaunchConfig<block_size>());
 
