@@ -1,5 +1,5 @@
 set(CMAKE_CXX_COMPILER "amdclang++" CACHE STRING "")
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
 set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "")
-set(Kokkos_DIR "/ccs/home/mwaruszewski/kokkos-crusher/lib64/cmake/Kokkos" CACHE STRING "")
+set(Kokkos_DIR "/ccs/home/mwaruszewski/kokkos-frontier/lib64/cmake/Kokkos" CACHE STRING "")
 set(OMEGA_USE_HIERARCHICAL OFF CACHE BOOL "")

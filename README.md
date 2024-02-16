@@ -1,6 +1,7 @@
 # Building
 
-Example of gpu build on Frontier
+Example of gpu build on Frontier. First look in `machines/frontier.cmake` and change `Kokkos_DIR` to your Kokkos installation. Then
+do:
 ```
 mkdir build
 cd build
