@@ -28,22 +28,22 @@ void RK4Stepper::do_step(Real t, Real dt,
                          const ShallowWaterState &state) const {
   const auto &mesh = m_shallow_water->m_mesh;
 
-  YAKL_SCOPE(h_old_cell, m_old_state.m_h_cell);
-  YAKL_SCOPE(vn_old_edge, m_old_state.m_vn_edge);
-  YAKL_SCOPE(tr_old_cell, m_old_state.m_tr_cell);
+  OMEGA_SCOPE(h_old_cell, m_old_state.m_h_cell);
+  OMEGA_SCOPE(vn_old_edge, m_old_state.m_vn_edge);
+  OMEGA_SCOPE(tr_old_cell, m_old_state.m_tr_cell);
 
-  YAKL_SCOPE(h_tend_cell, m_tend.m_h_cell);
-  YAKL_SCOPE(vn_tend_edge, m_tend.m_vn_edge);
-  YAKL_SCOPE(tr_tend_cell, m_tend.m_tr_cell);
+  OMEGA_SCOPE(h_tend_cell, m_tend.m_h_cell);
+  OMEGA_SCOPE(vn_tend_edge, m_tend.m_vn_edge);
+  OMEGA_SCOPE(tr_tend_cell, m_tend.m_tr_cell);
 
-  YAKL_SCOPE(h_provis_cell, m_provis_state.m_h_cell);
-  YAKL_SCOPE(vn_provis_edge, m_provis_state.m_vn_edge);
-  YAKL_SCOPE(tr_provis_cell, m_provis_state.m_tr_cell);
+  OMEGA_SCOPE(h_provis_cell, m_provis_state.m_h_cell);
+  OMEGA_SCOPE(vn_provis_edge, m_provis_state.m_vn_edge);
+  OMEGA_SCOPE(tr_provis_cell, m_provis_state.m_tr_cell);
   Int ntracers = m_shallow_water->m_ntracers;
 
-  state.m_h_cell.deep_copy_to(h_old_cell);
-  state.m_vn_edge.deep_copy_to(vn_old_edge);
-  state.m_tr_cell.deep_copy_to(tr_old_cell);
+  deep_copy(h_old_cell, state.m_h_cell);
+  deep_copy(vn_old_edge, state.m_vn_edge);
+  deep_copy(tr_old_cell, state.m_tr_cell);
 
   // k1
   m_shallow_water->compute_tendency(m_tend, state, t);
@@ -52,20 +52,26 @@ void RK4Stepper::do_step(Real t, Real dt,
 
     const Real rkb_stage = m_rkb[stage];
     parallel_for(
-        "rk4_accumulate_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-        YAKL_LAMBDA(Int icell, Int k) {
+        "rk4_accumulate_h",
+        MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
+                         {tile1, tile2}),
+        KOKKOS_LAMBDA(Int icell, Int k) {
           state.m_h_cell(icell, k) += dt * rkb_stage * h_tend_cell(icell, k);
         });
     parallel_for(
-        "rk4_accumulate_v", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-        YAKL_LAMBDA(Int iedge, Int k) {
+        "rk4_accumulate_v",
+        MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
+                         {tile1, tile2}),
+        KOKKOS_LAMBDA(Int iedge, Int k) {
           state.m_vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
     if (ntracers > 0) {
       parallel_for(
           "rk4_accumulate_tr",
-          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-          YAKL_LAMBDA(Int l, Int icell, Int k) {
+          MDRangePolicy<3>({0, 0, 0},
+                           {ntracers, mesh->m_ncells, mesh->m_nlayers},
+                           {1, tile1, tile2}),
+          KOKKOS_LAMBDA(Int l, Int icell, Int k) {
             state.m_tr_cell(l, icell, k) +=
                 dt * rkb_stage * tr_tend_cell(l, icell, k);
           });
@@ -77,23 +83,27 @@ void RK4Stepper::do_step(Real t, Real dt,
 
       parallel_for(
           "rk4_compute_h_provis",
-          SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-          YAKL_LAMBDA(Int icell, Int k) {
+          MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
+                           {tile1, tile2}),
+          KOKKOS_LAMBDA(Int icell, Int k) {
             h_provis_cell(icell, k) =
                 h_old_cell(icell, k) + dt * rka_stage * h_tend_cell(icell, k);
           });
       parallel_for(
           "rk4_compute_vn_provis",
-          SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-          YAKL_LAMBDA(Int iedge, Int k) {
+          MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
+                           {tile1, tile2}),
+          KOKKOS_LAMBDA(Int iedge, Int k) {
             vn_provis_edge(iedge, k) =
                 vn_old_edge(iedge, k) + dt * rka_stage * vn_tend_edge(iedge, k);
           });
       if (ntracers > 0) {
         parallel_for(
             "rk4_compute_tr_provis",
-            SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-            YAKL_LAMBDA(Int l, Int icell, Int k) {
+            MDRangePolicy<3>({0, 0, 0},
+                             {ntracers, mesh->m_ncells, mesh->m_nlayers},
+                             {1, tile1, tile2}),
+            KOKKOS_LAMBDA(Int l, Int icell, Int k) {
               tr_provis_cell(l, icell, k) =
                   tr_old_cell(l, icell, k) +
                   dt * rka_stage * tr_tend_cell(l, icell, k);

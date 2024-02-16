@@ -1,6 +1,6 @@
 #pragma once
 
-#include <YAKL.h>
+#include <Kokkos_Core.hpp>
 #include <cmath>
 
 namespace omega {
@@ -8,42 +8,56 @@ namespace omega {
 using Real = double;
 using Int = int;
 
-YAKL_INLINE constexpr Real operator""_fp(long double x) { return x; }
+KOKKOS_INLINE_FUNCTION constexpr Real operator""_fp(long double x) { return x; }
 
 constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
 
 constexpr Real pi = M_PI;
 
-using yakl::SArray;
-using yakl::c::Bounds;
-using yakl::c::parallel_for;
-using yakl::c::SimpleBounds;
+#define OMEGA_SCOPE(a, b) auto &a = b
 
-constexpr Int block_size = 256;
-using yakl::LaunchConfig;
+using Kokkos::deep_copy;
+using Kokkos::parallel_for;
+using Kokkos::parallel_reduce;
+using Kokkos::TeamThreadRange;
+using Kokkos::ThreadVectorRange;
 
-using Real1d = yakl::Array<Real, 1, yakl::memDevice, yakl::styleC>;
-using Real2d = yakl::Array<Real, 2, yakl::memDevice, yakl::styleC>;
-using Real3d = yakl::Array<Real, 3, yakl::memDevice, yakl::styleC>;
-using Real4d = yakl::Array<Real, 4, yakl::memDevice, yakl::styleC>;
+using ExecSpace = Kokkos::DefaultExecutionSpace;
+using MemSpace = ExecSpace::memory_space;
+using Layout = Kokkos::LayoutRight;
 
-using RealConst1d = yakl::Array<Real const, 1, yakl::memDevice, yakl::styleC>;
-using RealConst2d = yakl::Array<Real const, 2, yakl::memDevice, yakl::styleC>;
-using RealConst3d = yakl::Array<Real const, 3, yakl::memDevice, yakl::styleC>;
-using RealConst4d = yakl::Array<Real const, 4, yakl::memDevice, yakl::styleC>;
+using RangePolicy = Kokkos::RangePolicy<ExecSpace>;
+using TeamPolicy = Kokkos::TeamPolicy<ExecSpace>;
+using TeamMember = TeamPolicy::member_type;
 
-using RealHost1d = yakl::Array<Real, 1, yakl::memHost, yakl::styleC>;
-using RealHost2d = yakl::Array<Real, 2, yakl::memHost, yakl::styleC>;
-using RealHost3d = yakl::Array<Real, 3, yakl::memHost, yakl::styleC>;
-using RealHost4d = yakl::Array<Real, 4, yakl::memHost, yakl::styleC>;
+constexpr Int tile1 = 1;
+constexpr Int tile2 = 64;
 
-using Int1d = yakl::Array<Int, 1, yakl::memDevice, yakl::styleC>;
-using Int2d = yakl::Array<Int, 2, yakl::memDevice, yakl::styleC>;
-using Int3d = yakl::Array<Int, 3, yakl::memDevice, yakl::styleC>;
-using Int4d = yakl::Array<Int, 4, yakl::memDevice, yakl::styleC>;
+constexpr Int team_size = 1;
+constexpr Int vector_size = 64;
 
-using IntHost1d = yakl::Array<Int, 1, yakl::memHost, yakl::styleC>;
-using IntHost2d = yakl::Array<Int, 2, yakl::memHost, yakl::styleC>;
-using IntHost3d = yakl::Array<Int, 3, yakl::memHost, yakl::styleC>;
-using IntHost4d = yakl::Array<Int, 4, yakl::memHost, yakl::styleC>;
+template <Int N>
+using MDRangePolicy = Kokkos::MDRangePolicy<
+    ExecSpace, Kokkos::Rank<N, Kokkos::Iterate::Right, Kokkos::Iterate::Right>>;
+
+using Real1d = Kokkos::View<Real *, Layout, MemSpace>;
+using Real2d = Kokkos::View<Real **, Layout, MemSpace>;
+using Real3d = Kokkos::View<Real ***, Layout, MemSpace>;
+using Real4d = Kokkos::View<Real ****, Layout, MemSpace>;
+
+using RealConst1d = Kokkos::View<Real const *, Layout, MemSpace>;
+using RealConst2d = Kokkos::View<Real const **, Layout, MemSpace>;
+using RealConst3d = Kokkos::View<Real const ***, Layout, MemSpace>;
+using RealConst4d = Kokkos::View<Real const ****, Layout, MemSpace>;
+
+using Int1d = Kokkos::View<Int *, Layout, MemSpace>;
+using Int2d = Kokkos::View<Int **, Layout, MemSpace>;
+using Int3d = Kokkos::View<Int ***, Layout, MemSpace>;
+using Int4d = Kokkos::View<Int ****, Layout, MemSpace>;
+
+using IntConst1d = Kokkos::View<Int const *, Layout, MemSpace>;
+using IntConst2d = Kokkos::View<Int const **, Layout, MemSpace>;
+using IntConst3d = Kokkos::View<Int const ***, Layout, MemSpace>;
+using IntConst4d = Kokkos::View<Int const ****, Layout, MemSpace>;
+
 } // namespace omega

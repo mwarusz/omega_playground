@@ -19,7 +19,8 @@ void MPASMesh::finalize_mesh() {
   m_edge_sign_on_vertex = Real2d("edge_sign_on_vertex", m_nvertices, 3);
 
   parallel_for(
-      "finalize_cell", m_ncells, YAKL_CLASS_LAMBDA(Int icell) {
+      "finalize_cell", RangePolicy(0, m_ncells),
+      KOKKOS_CLASS_LAMBDA(Int icell) {
         for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
           m_edge_sign_on_cell(icell, j) =
               m_cells_on_edge(m_edges_on_cell(icell, j), 0) == icell ? 1 : -1;
@@ -36,7 +37,8 @@ void MPASMesh::finalize_mesh() {
       });
 
   parallel_for(
-      "finalize_vertex", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {
+      "finalize_vertex", RangePolicy(0, m_nvertices),
+      KOKKOS_CLASS_LAMBDA(Int ivertex) {
         for (Int j = 0; j < 3; ++j) {
           m_edge_sign_on_vertex(ivertex, j) =
               m_vertices_on_edge(m_edges_on_vertex(ivertex, j), 0) == ivertex
@@ -45,15 +47,15 @@ void MPASMesh::finalize_mesh() {
         }
       });
 
-  yakl::memset(m_mesh_scaling_del2, 1);
-  yakl::memset(m_mesh_scaling_del4, 1);
-  yakl::memset(m_edge_mask, 1);
+  deep_copy(m_mesh_scaling_del2, 1);
+  deep_copy(m_mesh_scaling_del4, 1);
+  deep_copy(m_edge_mask, 1);
 
-  yakl::memset(m_max_level_cell, m_nlayers);
-  yakl::memset(m_max_level_edge_bot, m_nlayers);
-  yakl::memset(m_max_level_edge_top, m_nlayers);
-  yakl::memset(m_max_level_vertex_bot, m_nlayers);
-  yakl::memset(m_max_level_vertex_top, m_nlayers);
+  deep_copy(m_max_level_cell, m_nlayers);
+  deep_copy(m_max_level_edge_bot, m_nlayers);
+  deep_copy(m_max_level_edge_top, m_nlayers);
+  deep_copy(m_max_level_vertex_bot, m_nlayers);
+  deep_copy(m_max_level_vertex_top, m_nlayers);
 }
 
 } // namespace omega

@@ -1,6 +1,5 @@
 macro(add_omega_test testname)
   add_executable(${testname} ${testname}.cpp)
-  yakl_process_target(${testname})
   target_link_libraries(${testname} omega)
   add_test(NAME ${testname}_test COMMAND ./${testname})
 endmacro(add_omega_test)

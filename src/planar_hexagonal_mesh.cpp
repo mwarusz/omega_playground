@@ -60,12 +60,13 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
   compute_mesh_arrays();
 }
 
-YAKL_INLINE Int PlanarHexagonalMesh::cellidx(Int icol, Int irow) const {
+KOKKOS_INLINE_FUNCTION Int PlanarHexagonalMesh::cellidx(Int icol,
+                                                        Int irow) const {
   return irow * m_nx + icol;
 }
 
-YAKL_INLINE Int PlanarHexagonalMesh::cell_on_cell(Int icol, Int irow,
-                                                  Int nb) const {
+KOKKOS_INLINE_FUNCTION Int PlanarHexagonalMesh::cell_on_cell(Int icol, Int irow,
+                                                             Int nb) const {
   Int mx = icol == 0 ? m_nx - 1 : icol - 1;
   Int px = icol == (m_nx - 1) ? 0 : icol + 1;
 
@@ -114,8 +115,9 @@ YAKL_INLINE Int PlanarHexagonalMesh::cell_on_cell(Int icol, Int irow,
   return -1;
 }
 
-YAKL_INLINE Int PlanarHexagonalMesh::edge_on_cell(Int icell, Int icol, Int irow,
-                                                  Int nb) const {
+KOKKOS_INLINE_FUNCTION Int PlanarHexagonalMesh::edge_on_cell(Int icell,
+                                                             Int icol, Int irow,
+                                                             Int nb) const {
   if (nb == 0) {
     return 3 * icell;
   }
@@ -137,8 +139,10 @@ YAKL_INLINE Int PlanarHexagonalMesh::edge_on_cell(Int icell, Int icol, Int irow,
   return -1;
 }
 
-YAKL_INLINE Int PlanarHexagonalMesh::vertex_on_cell(Int icell, Int icol,
-                                                    Int irow, Int nb) const {
+KOKKOS_INLINE_FUNCTION Int PlanarHexagonalMesh::vertex_on_cell(Int icell,
+                                                               Int icol,
+                                                               Int irow,
+                                                               Int nb) const {
   if (nb == 0) {
     return 2 * icell;
   }
@@ -162,8 +166,8 @@ YAKL_INLINE Int PlanarHexagonalMesh::vertex_on_cell(Int icell, Int icol,
 
 void PlanarHexagonalMesh::compute_mesh_arrays() {
   parallel_for(
-      "compute_mesh_arrays", SimpleBounds<2>(m_ny, m_nx),
-      YAKL_CLASS_LAMBDA(Int irow, Int icol) {
+      "compute_mesh_arrays", MDRangePolicy<2>({0, 0}, {m_ny, m_nx}),
+      KOKKOS_CLASS_LAMBDA(Int irow, Int icol) {
         Int icell = cellidx(icol, irow);
         m_nedges_on_cell(icell) = 6;
 
@@ -316,14 +320,14 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
       });
 
   parallel_for(
-      "scale_weights", SimpleBounds<2>(m_nedges, 2 * maxedges),
-      YAKL_CLASS_LAMBDA(Int iedge, Int j) {
+      "scale_weights", MDRangePolicy<2>({0, 0}, {m_nedges, 2 * maxedges}),
+      KOKKOS_CLASS_LAMBDA(Int iedge, Int j) {
         m_weights_on_edge(iedge, j) *= 1. / sqrt(3);
       });
 
   parallel_for(
-      "compute_cell_arrays", SimpleBounds<2>(m_ny, m_nx),
-      YAKL_CLASS_LAMBDA(Int irow, Int icol) {
+      "compute_cell_arrays", MDRangePolicy<2>({0, 0}, {m_ny, m_nx}),
+      KOKKOS_CLASS_LAMBDA(Int irow, Int icol) {
         Int icell = cellidx(icol, irow);
         m_area_cell(icell) = m_dc * m_dc * sqrt(3) / 2;
         m_lat_cell(icell) = 0;
@@ -371,7 +375,8 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
       });
 
   parallel_for(
-      "compute_edge_arrays", m_nedges, YAKL_CLASS_LAMBDA(Int iedge) {
+      "compute_edge_arrays", RangePolicy(0, m_nedges),
+      KOKKOS_CLASS_LAMBDA(Int iedge) {
         m_nedges_on_edge(iedge) = 10;
         m_dc_edge(iedge) = m_dc;
         m_dv_edge(iedge) = m_dc_edge(iedge) * sqrt(3) / 3;
@@ -380,7 +385,8 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
       });
 
   parallel_for(
-      "compute_vertex_arrays", m_nvertices, YAKL_CLASS_LAMBDA(Int ivertex) {
+      "compute_vertex_arrays", RangePolicy(0, m_nvertices),
+      KOKKOS_CLASS_LAMBDA(Int ivertex) {
         m_lat_vertex(ivertex) = 0;
         m_lon_vertex(ivertex) = 0;
         m_area_triangle(ivertex) = m_dc * m_dc * sqrt(3) / 4;

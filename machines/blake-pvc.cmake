@@ -1,6 +1,6 @@
 set(CMAKE_CXX_COMPILER "icpx" CACHE STRING "")
-set(CMAKE_C_COMPILER "icc" CACHE STRING "")
-set(CMAKE_Fortran_COMPILER "ifort" CACHE STRING "")
-
-set(YAKL_ARCH "SYCL" CACHE STRING "")
-set(YAKL_SYCL_FLAGS "-O3 -fsycl -sycl-std=2020 -fsycl-unnamed-lambda -fsycl-device-code-split=per_kernel -fsycl-targets=spir64 -mlong-double-64 -Xclang -mlong-double-64" CACHE STRING "")
+set(CMAKE_CUDA_ARCHITECTURES "90" CACHE STRING "")
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
+set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "")
+set(Kokkos_DIR "/home/mwarusz/kokkos-blake-h100/lib64/cmake/Kokkos" CACHE STRING "")
+set(OMEGA_USE_HIERARCHICAL OFF CACHE BOOL "")

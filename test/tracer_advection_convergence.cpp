@@ -13,18 +13,18 @@ struct TracerAdvectionTest {
   Real m_lx = 1;
   Real m_ly = std::sqrt(3) / 2 * m_lx;
 
-  YAKL_INLINE Real h(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real h(Real x, Real y, Real t) const {
     return std::exp(std::cos(2 * pi * x / m_lx));
   }
 
-  YAKL_INLINE Real tr(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real tr(Real x, Real y, Real t) const {
     return std::sin(2 * pi * (x - t) / m_lx) *
            std::sin(2 * pi * (y - t) / m_ly);
   }
 
-  YAKL_INLINE Real vx(Real x, Real y, Real t) const { return 1; }
+  KOKKOS_INLINE_FUNCTION Real vx(Real x, Real y, Real t) const { return 1; }
 
-  YAKL_INLINE Real vy(Real x, Real y, Real t) const { return 1; }
+  KOKKOS_INLINE_FUNCTION Real vy(Real x, Real y, Real t) const { return 1; }
 };
 
 Real run(Int nx) {
@@ -54,11 +54,12 @@ Real run(Int nx) {
   auto &tr_cell = state.m_tr_cell;
   Real3d tr_exact_cell("tr_exact_cell", params.m_ntracers, mesh->m_ncells,
                        mesh->m_nlayers);
-  YAKL_SCOPE(x_cell, mesh->m_x_cell);
-  YAKL_SCOPE(y_cell, mesh->m_y_cell);
+  OMEGA_SCOPE(x_cell, mesh->m_x_cell);
+  OMEGA_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h_and_tr", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
+      "init_h_and_tr",
+      MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k) {
         Real x = x_cell(icell);
         Real y = y_cell(icell);
         h_cell(icell, k) = advection_test.h(x, y, 0);
@@ -67,12 +68,12 @@ Real run(Int nx) {
       });
 
   auto &vn_edge = state.m_vn_edge;
-  YAKL_SCOPE(x_edge, mesh->m_x_edge);
-  YAKL_SCOPE(y_edge, mesh->m_y_edge);
-  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
+  OMEGA_SCOPE(x_edge, mesh->m_x_edge);
+  OMEGA_SCOPE(y_edge, mesh->m_y_edge);
+  OMEGA_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
+      "init_vn", MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int iedge, Int k) {
         Real x = x_edge(iedge);
         Real y = y_edge(iedge);
         Real nx = std::cos(angle_edge(iedge));
@@ -87,19 +88,21 @@ Real run(Int nx) {
     stepper.do_step(t, dt, state);
   }
 
-  parallel_for(
-      "compute_error", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
-        tr_exact_cell(0, icell, k) -= tr_cell(0, icell, k);
-        tr_exact_cell(0, icell, k) *= tr_exact_cell(0, icell, k);
-      });
+  Real errf;
+  parallel_reduce(
+      "compute_error",
+      MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k, Real & accum) {
+        Real err = tr_exact_cell(0, icell, k) - tr_cell(0, icell, k);
+        accum += err * err;
+      },
+      errf);
 
-  return std::sqrt(yakl::intrinsics::sum(tr_exact_cell) /
-                   (mesh->m_nx * mesh->m_ny));
+  return std::sqrt(errf / (mesh->m_nx * mesh->m_ny));
 }
 
 int main() {
-  yakl::init();
+  Kokkos::initialize();
 
   Int nlevels = 2;
   Int nx = 50;
@@ -128,5 +131,5 @@ int main() {
     }
   }
 
-  yakl::finalize();
+  Kokkos::finalize();
 }

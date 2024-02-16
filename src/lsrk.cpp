@@ -6,10 +6,10 @@ LSRKStepper::LSRKStepper(ShallowWaterModelBase &shallow_water, Int nstages)
     : TimeStepper(shallow_water), m_nstages(nstages), m_rka(nstages),
       m_rkb(nstages), m_rkc(nstages), m_tend(shallow_water) {
 
-  yakl::memset(m_tend.m_h_cell, 0);
-  yakl::memset(m_tend.m_vn_edge, 0);
+  deep_copy(m_tend.m_h_cell, 0);
+  deep_copy(m_tend.m_vn_edge, 0);
   if (shallow_water.m_ntracers > 0) {
-    yakl::memset(m_tend.m_tr_cell, 0);
+    deep_copy(m_tend.m_tr_cell, 0);
   }
 
   if (m_nstages == 5) {
@@ -36,24 +36,34 @@ void LSRKStepper::do_step(Real t, Real dt,
                           const ShallowWaterState &state) const {
   const auto &mesh = m_shallow_water->m_mesh;
 
-  YAKL_SCOPE(h_tend_cell, m_tend.m_h_cell);
-  YAKL_SCOPE(vn_tend_edge, m_tend.m_vn_edge);
-  YAKL_SCOPE(tr_tend_cell, m_tend.m_tr_cell);
+  OMEGA_SCOPE(h_tend_cell, m_tend.m_h_cell);
+  OMEGA_SCOPE(vn_tend_edge, m_tend.m_vn_edge);
+  OMEGA_SCOPE(tr_tend_cell, m_tend.m_tr_cell);
   Int ntracers = m_shallow_water->m_ntracers;
 
   for (Int stage = 0; stage < m_nstages; ++stage) {
     Real rka_stage = m_rka[stage];
     parallel_for(
-        "lsrk1_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-        YAKL_LAMBDA(Int icell, Int k) { h_tend_cell(icell, k) *= rka_stage; });
+        "lsrk1_h",
+        MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
+                         {tile1, tile2}),
+        KOKKOS_LAMBDA(Int icell, Int k) {
+          h_tend_cell(icell, k) *= rka_stage;
+        });
     parallel_for(
-        "lsrk1_v", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-        YAKL_LAMBDA(Int iedge, Int k) { vn_tend_edge(iedge, k) *= rka_stage; });
+        "lsrk1_v",
+        MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
+                         {tile1, tile2}),
+        KOKKOS_LAMBDA(Int iedge, Int k) {
+          vn_tend_edge(iedge, k) *= rka_stage;
+        });
     if (ntracers > 0) {
       parallel_for(
           "lsrk1_tr",
-          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-          YAKL_LAMBDA(Int l, Int icell, Int k) {
+          MDRangePolicy<3>({0, 0, 0},
+                           {ntracers, mesh->m_ncells, mesh->m_nlayers},
+                           {1, tile1, tile2}),
+          KOKKOS_LAMBDA(Int l, Int icell, Int k) {
             tr_tend_cell(l, icell, k) *= rka_stage;
           });
     }
@@ -64,20 +74,26 @@ void LSRKStepper::do_step(Real t, Real dt,
 
     Real rkb_stage = m_rkb[stage];
     parallel_for(
-        "lsrk2_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-        YAKL_LAMBDA(Int icell, Int k) {
+        "lsrk2_h",
+        MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
+                         {tile1, tile2}),
+        KOKKOS_LAMBDA(Int icell, Int k) {
           state.m_h_cell(icell, k) += dt * rkb_stage * h_tend_cell(icell, k);
         });
     parallel_for(
-        "lsrk2_v", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-        YAKL_LAMBDA(Int iedge, Int k) {
+        "lsrk2_v",
+        MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
+                         {tile1, tile2}),
+        KOKKOS_LAMBDA(Int iedge, Int k) {
           state.m_vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
     if (ntracers > 0) {
       parallel_for(
           "lsrk2_tr",
-          SimpleBounds<3>(ntracers, mesh->m_ncells, mesh->m_nlayers),
-          YAKL_LAMBDA(Int l, Int icell, Int k) {
+          MDRangePolicy<3>({0, 0, 0},
+                           {ntracers, mesh->m_ncells, mesh->m_nlayers},
+                           {1, tile1, tile2}),
+          KOKKOS_LAMBDA(Int l, Int icell, Int k) {
             state.m_tr_cell(l, icell, k) +=
                 dt * rkb_stage * tr_tend_cell(l, icell, k);
           });

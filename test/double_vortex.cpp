@@ -21,7 +21,7 @@ struct DoubleVortex {
   Real m_xc2 = (0.5 + m_ox) * m_lx;
   Real m_yc2 = (0.5 + m_oy) * m_ly;
 
-  YAKL_INLINE Real h(Real x, Real y) const {
+  KOKKOS_INLINE_FUNCTION Real h(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
@@ -35,7 +35,7 @@ struct DoubleVortex {
                           4. * pi * m_sigmax * m_sigmay / m_lx / m_ly);
   }
 
-  YAKL_INLINE Real vx(Real x, Real y) const {
+  KOKKOS_INLINE_FUNCTION Real vx(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
@@ -55,7 +55,7 @@ struct DoubleVortex {
     return vx;
   }
 
-  YAKL_INLINE Real vy(Real x, Real y) const {
+  KOKKOS_INLINE_FUNCTION Real vy(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
@@ -100,23 +100,23 @@ void run(Int nx, Real cfl) {
   dt = timeend / numberofsteps;
 
   auto &h_cell = state.m_h_cell;
-  YAKL_SCOPE(x_cell, mesh->m_x_cell);
-  YAKL_SCOPE(y_cell, mesh->m_y_cell);
+  OMEGA_SCOPE(x_cell, mesh->m_x_cell);
+  OMEGA_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
+      "init_h", MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k) {
         Real x = x_cell(icell);
         Real y = y_cell(icell);
         h_cell(icell, k) = double_vortex.h(x, y);
       });
 
   auto &vn_edge = state.m_vn_edge;
-  YAKL_SCOPE(x_edge, mesh->m_x_edge);
-  YAKL_SCOPE(y_edge, mesh->m_y_edge);
-  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
+  OMEGA_SCOPE(x_edge, mesh->m_x_edge);
+  OMEGA_SCOPE(y_edge, mesh->m_y_edge);
+  OMEGA_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
+      "init_vn", MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int iedge, Int k) {
         Real x = x_edge(iedge);
         Real y = y_edge(iedge);
         Real nx = std::cos(angle_edge(iedge));
@@ -130,20 +130,20 @@ void run(Int nx, Real cfl) {
   Real cir0 = shallow_water.circulation_integral(vn_edge);
   Real en0 = shallow_water.energy_integral(h_cell, vn_edge);
 
-  std::cout << "Initial h: " << yakl::intrinsics::minval(h_cell) << " "
-            << yakl::intrinsics::maxval(h_cell) << std::endl;
-  std::cout << "Initial vn: " << yakl::intrinsics::minval(vn_edge) << " "
-            << yakl::intrinsics::maxval(vn_edge) << std::endl;
+  // std::cout << "Initial h: " << yakl::intrinsics::minval(h_cell) << " "
+  //           << yakl::intrinsics::maxval(h_cell) << std::endl;
+  // std::cout << "Initial vn: " << yakl::intrinsics::minval(vn_edge) << " "
+  //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
 
-  std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
-            << yakl::intrinsics::maxval(h_cell) << std::endl;
-  std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
-            << yakl::intrinsics::maxval(vn_edge) << std::endl;
+  // std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
+  //           << yakl::intrinsics::maxval(h_cell) << std::endl;
+  // std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
+  //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
   Real massf = shallow_water.mass_integral(h_cell);
   Real cirf = shallow_water.circulation_integral(vn_edge);
@@ -169,7 +169,7 @@ void run(Int nx, Real cfl) {
 }
 
 int main(int argc, char *argv[]) {
-  yakl::init();
+  Kokkos::initialize();
 
   Int nx = 25;
   Real cfl = 0.1;
@@ -183,5 +183,5 @@ int main(int argc, char *argv[]) {
 
   run(nx, cfl);
 
-  yakl::finalize();
+  Kokkos::finalize();
 }

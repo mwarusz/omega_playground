@@ -22,19 +22,19 @@ struct ManufacturedSolution {
   Real m_ky = m_my * (2 * pi / m_ly);
   Real m_omega = std::sqrt(m_grav * m_h0 * (m_kx * m_kx + m_ky * m_ky));
 
-  YAKL_INLINE Real h(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real h(Real x, Real y, Real t) const {
     return m_h0 + m_eta0 * std::sin(m_kx * x + m_ky * y - m_omega * t);
   }
 
-  YAKL_INLINE Real vx(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real vx(Real x, Real y, Real t) const {
     return m_eta0 * std::cos(m_kx * x + m_ky * y - m_omega * t);
   }
 
-  YAKL_INLINE Real vy(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real vy(Real x, Real y, Real t) const {
     return m_eta0 * std::cos(m_kx * x + m_ky * y - m_omega * t);
   }
 
-  YAKL_INLINE Real h_tend(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real h_tend(Real x, Real y, Real t) const {
     using std::cos;
     using std::sin;
 
@@ -43,7 +43,7 @@ struct ManufacturedSolution {
                      m_eta0 * (m_kx + m_ky) * cos(2 * phi));
   }
 
-  YAKL_INLINE Real vx_tend(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real vx_tend(Real x, Real y, Real t) const {
     using std::cos;
     using std::sin;
 
@@ -52,7 +52,7 @@ struct ManufacturedSolution {
                      m_eta0 * (m_kx + m_ky) * sin(2 * phi) / 2);
   }
 
-  YAKL_INLINE Real vy_tend(Real x, Real y, Real t) const {
+  KOKKOS_INLINE_FUNCTION Real vy_tend(Real x, Real y, Real t) const {
     using std::cos;
     using std::sin;
 
@@ -78,13 +78,14 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
     using std::cos;
     using std::sin;
 
-    YAKL_SCOPE(manufactured_solution, m_manufactured_solution);
+    OMEGA_SCOPE(manufactured_solution, m_manufactured_solution);
 
-    YAKL_SCOPE(x_cell, m_mesh->m_x_cell);
-    YAKL_SCOPE(y_cell, m_mesh->m_y_cell);
-    YAKL_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
+    OMEGA_SCOPE(x_cell, m_mesh->m_x_cell);
+    OMEGA_SCOPE(y_cell, m_mesh->m_y_cell);
+    OMEGA_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
     parallel_for(
-        "manufactured_htend", m_mesh->m_ncells, YAKL_LAMBDA(Int icell) {
+        "manufactured_htend", RangePolicy(0, m_mesh->m_ncells),
+        KOKKOS_LAMBDA(Int icell) {
           for (Int k = 0; k < max_level_cell(icell); ++k) {
             Real x = x_cell(icell);
             Real y = y_cell(icell);
@@ -92,12 +93,13 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
           }
         });
 
-    YAKL_SCOPE(x_edge, m_mesh->m_x_edge);
-    YAKL_SCOPE(y_edge, m_mesh->m_y_edge);
-    YAKL_SCOPE(angle_edge, m_mesh->m_angle_edge);
-    YAKL_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
+    OMEGA_SCOPE(x_edge, m_mesh->m_x_edge);
+    OMEGA_SCOPE(y_edge, m_mesh->m_y_edge);
+    OMEGA_SCOPE(angle_edge, m_mesh->m_angle_edge);
+    OMEGA_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
     parallel_for(
-        "manufactured_vtend", m_mesh->m_nedges, YAKL_LAMBDA(Int iedge) {
+        "manufactured_vtend", RangePolicy(0, m_mesh->m_nedges),
+        KOKKOS_LAMBDA(Int iedge) {
           for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
             Real x = x_edge(iedge);
             Real y = y_edge(iedge);
@@ -135,11 +137,11 @@ Real run(Int n) {
 
   auto &h_cell = state.m_h_cell;
   Real2d hexact_cell("hexact_cell", mesh->m_ncells, mesh->m_nlayers);
-  YAKL_SCOPE(x_cell, mesh->m_x_cell);
-  YAKL_SCOPE(y_cell, mesh->m_y_cell);
+  OMEGA_SCOPE(x_cell, mesh->m_x_cell);
+  OMEGA_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
+      "init_h", MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k) {
         Real x = x_cell(icell);
         Real y = y_cell(icell);
         h_cell(icell, k) = manufactured_solution.h(x, y, 0);
@@ -147,12 +149,12 @@ Real run(Int n) {
       });
 
   auto &vn_edge = state.m_vn_edge;
-  YAKL_SCOPE(x_edge, mesh->m_x_edge);
-  YAKL_SCOPE(y_edge, mesh->m_y_edge);
-  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
+  OMEGA_SCOPE(x_edge, mesh->m_x_edge);
+  OMEGA_SCOPE(y_edge, mesh->m_y_edge);
+  OMEGA_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
+      "init_vn", MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int iedge, Int k) {
         Real x = x_edge(iedge);
         Real y = y_edge(iedge);
         Real nx = std::cos(angle_edge(iedge));
@@ -167,19 +169,21 @@ Real run(Int n) {
     stepper.do_step(t, dt, state);
   }
 
-  parallel_for(
-      "compute_error", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
-        hexact_cell(icell, k) -= h_cell(icell, k);
-        hexact_cell(icell, k) *= hexact_cell(icell, k);
-      });
+  Real errf;
+  parallel_reduce(
+      "compute_error",
+      MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k, Real & accum) {
+        Real err = hexact_cell(icell, k) - h_cell(icell, k);
+        accum += err * err;
+      },
+      errf);
 
-  return std::sqrt(yakl::intrinsics::sum(hexact_cell) /
-                   (mesh->m_nx * mesh->m_ny));
+  return std::sqrt(errf / (mesh->m_nx * mesh->m_ny));
 }
 
 int main() {
-  yakl::init();
+  Kokkos::initialize();
 
   Int nlevels = 2;
   std::vector<Real> err(nlevels);
@@ -208,5 +212,5 @@ int main() {
     }
   }
 
-  yakl::finalize();
+  Kokkos::finalize();
 }
