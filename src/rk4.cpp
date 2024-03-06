@@ -51,26 +51,19 @@ void RK4Stepper::do_step(Real t, Real dt,
   for (Int stage = 0; stage < nstages; ++stage) {
 
     const Real rkb_stage = m_rkb[stage];
-    parallel_for(
-        "rk4_accumulate_h",
-        MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "rk4_accumulate_h", {mesh->m_ncells, mesh->m_nlayers},
         KOKKOS_LAMBDA(Int icell, Int k) {
           state.m_h_cell(icell, k) += dt * rkb_stage * h_tend_cell(icell, k);
         });
-    parallel_for(
-        "rk4_accumulate_v",
-        MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "rk4_accumulate_v", {mesh->m_nedges, mesh->m_nlayers},
         KOKKOS_LAMBDA(Int iedge, Int k) {
           state.m_vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
     if (ntracers > 0) {
-      parallel_for(
-          "rk4_accumulate_tr",
-          MDRangePolicy<3>({0, 0, 0},
-                           {ntracers, mesh->m_ncells, mesh->m_nlayers},
-                           {1, tile1, tile2}),
+      omega_parallel_for(
+          "rk4_accumulate_tr", {ntracers, mesh->m_ncells, mesh->m_nlayers},
           KOKKOS_LAMBDA(Int l, Int icell, Int k) {
             state.m_tr_cell(l, icell, k) +=
                 dt * rkb_stage * tr_tend_cell(l, icell, k);
@@ -81,28 +74,22 @@ void RK4Stepper::do_step(Real t, Real dt,
       Real stagetime = t + m_rkc[stage] * dt;
       const Real rka_stage = m_rka[stage];
 
-      parallel_for(
-          "rk4_compute_h_provis",
-          MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
-                           {tile1, tile2}),
+      omega_parallel_for(
+          "rk4_compute_h_provis", {mesh->m_ncells, mesh->m_nlayers},
           KOKKOS_LAMBDA(Int icell, Int k) {
             h_provis_cell(icell, k) =
                 h_old_cell(icell, k) + dt * rka_stage * h_tend_cell(icell, k);
           });
-      parallel_for(
-          "rk4_compute_vn_provis",
-          MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
-                           {tile1, tile2}),
+      omega_parallel_for(
+          "rk4_compute_vn_provis", {mesh->m_nedges, mesh->m_nlayers},
           KOKKOS_LAMBDA(Int iedge, Int k) {
             vn_provis_edge(iedge, k) =
                 vn_old_edge(iedge, k) + dt * rka_stage * vn_tend_edge(iedge, k);
           });
       if (ntracers > 0) {
-        parallel_for(
+        omega_parallel_for(
             "rk4_compute_tr_provis",
-            MDRangePolicy<3>({0, 0, 0},
-                             {ntracers, mesh->m_ncells, mesh->m_nlayers},
-                             {1, tile1, tile2}),
+            {ntracers, mesh->m_ncells, mesh->m_nlayers},
             KOKKOS_LAMBDA(Int l, Int icell, Int k) {
               tr_provis_cell(l, icell, k) =
                   tr_old_cell(l, icell, k) +

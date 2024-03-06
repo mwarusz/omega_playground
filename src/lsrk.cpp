@@ -43,26 +43,19 @@ void LSRKStepper::do_step(Real t, Real dt,
 
   for (Int stage = 0; stage < m_nstages; ++stage) {
     Real rka_stage = m_rka[stage];
-    parallel_for(
-        "lsrk1_h",
-        MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "lsrk1_h", {mesh->m_ncells, mesh->m_nlayers},
         KOKKOS_LAMBDA(Int icell, Int k) {
           h_tend_cell(icell, k) *= rka_stage;
         });
-    parallel_for(
-        "lsrk1_v",
-        MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "lsrk1_v", {mesh->m_nedges, mesh->m_nlayers},
         KOKKOS_LAMBDA(Int iedge, Int k) {
           vn_tend_edge(iedge, k) *= rka_stage;
         });
     if (ntracers > 0) {
-      parallel_for(
-          "lsrk1_tr",
-          MDRangePolicy<3>({0, 0, 0},
-                           {ntracers, mesh->m_ncells, mesh->m_nlayers},
-                           {1, tile1, tile2}),
+      omega_parallel_for(
+          "lsrk1_tr", {ntracers, mesh->m_ncells, mesh->m_nlayers},
           KOKKOS_LAMBDA(Int l, Int icell, Int k) {
             tr_tend_cell(l, icell, k) *= rka_stage;
           });
@@ -73,26 +66,19 @@ void LSRKStepper::do_step(Real t, Real dt,
                                       AddMode::increment);
 
     Real rkb_stage = m_rkb[stage];
-    parallel_for(
-        "lsrk2_h",
-        MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "lsrk2_h", {mesh->m_ncells, mesh->m_nlayers},
         KOKKOS_LAMBDA(Int icell, Int k) {
           state.m_h_cell(icell, k) += dt * rkb_stage * h_tend_cell(icell, k);
         });
-    parallel_for(
-        "lsrk2_v",
-        MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "lsrk2_v", {mesh->m_nedges, mesh->m_nlayers},
         KOKKOS_LAMBDA(Int iedge, Int k) {
           state.m_vn_edge(iedge, k) += dt * rkb_stage * vn_tend_edge(iedge, k);
         });
     if (ntracers > 0) {
-      parallel_for(
-          "lsrk2_tr",
-          MDRangePolicy<3>({0, 0, 0},
-                           {ntracers, mesh->m_ncells, mesh->m_nlayers},
-                           {1, tile1, tile2}),
+      omega_parallel_for(
+          "lsrk2_tr", {ntracers, mesh->m_ncells, mesh->m_nlayers},
           KOKKOS_LAMBDA(Int l, Int icell, Int k) {
             state.m_tr_cell(l, icell, k) +=
                 dt * rkb_stage * tr_tend_cell(l, icell, k);

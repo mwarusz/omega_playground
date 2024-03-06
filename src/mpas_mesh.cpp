@@ -18,9 +18,8 @@ void MPASMesh::finalize_mesh() {
   m_max_level_vertex_top = Int1d("max_level_vertex_top", m_nvertices);
   m_edge_sign_on_vertex = Real2d("edge_sign_on_vertex", m_nvertices, 3);
 
-  parallel_for(
-      "finalize_cell", RangePolicy(0, m_ncells),
-      KOKKOS_CLASS_LAMBDA(Int icell) {
+  omega_parallel_for(
+      "finalize_cell", {m_ncells}, KOKKOS_CLASS_LAMBDA(Int icell) {
         for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
           m_edge_sign_on_cell(icell, j) =
               m_cells_on_edge(m_edges_on_cell(icell, j), 0) == icell ? 1 : -1;
@@ -36,9 +35,8 @@ void MPASMesh::finalize_mesh() {
         }
       });
 
-  parallel_for(
-      "finalize_vertex", RangePolicy(0, m_nvertices),
-      KOKKOS_CLASS_LAMBDA(Int ivertex) {
+  omega_parallel_for(
+      "finalize_vertex", {m_nvertices}, KOKKOS_CLASS_LAMBDA(Int ivertex) {
         for (Int j = 0; j < 3; ++j) {
           m_edge_sign_on_vertex(ivertex, j) =
               m_vertices_on_edge(m_edges_on_vertex(ivertex, j), 0) == ivertex

@@ -165,8 +165,8 @@ KOKKOS_INLINE_FUNCTION Int PlanarHexagonalMesh::vertex_on_cell(Int icell,
 }
 
 void PlanarHexagonalMesh::compute_mesh_arrays() {
-  parallel_for(
-      "compute_mesh_arrays", MDRangePolicy<2>({0, 0}, {m_ny, m_nx}),
+  omega_parallel_for(
+      "compute_mesh_arrays", {m_ny, m_nx},
       KOKKOS_CLASS_LAMBDA(Int irow, Int icol) {
         Int icell = cellidx(icol, irow);
         m_nedges_on_cell(icell) = 6;
@@ -319,14 +319,14 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
             m_edges_on_cell(icell, 2);
       });
 
-  parallel_for(
-      "scale_weights", MDRangePolicy<2>({0, 0}, {m_nedges, 2 * maxedges}),
+  omega_parallel_for(
+      "scale_weights", {m_nedges, 2 * maxedges},
       KOKKOS_CLASS_LAMBDA(Int iedge, Int j) {
         m_weights_on_edge(iedge, j) *= 1. / sqrt(3);
       });
 
-  parallel_for(
-      "compute_cell_arrays", MDRangePolicy<2>({0, 0}, {m_ny, m_nx}),
+  omega_parallel_for(
+      "compute_cell_arrays", {m_ny, m_nx},
       KOKKOS_CLASS_LAMBDA(Int irow, Int icol) {
         Int icell = cellidx(icol, irow);
         m_area_cell(icell) = m_dc * m_dc * sqrt(3) / 2;
@@ -374,9 +374,8 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         m_z_vertex(m_vertices_on_cell(icell, 1)) = 0;
       });
 
-  parallel_for(
-      "compute_edge_arrays", RangePolicy(0, m_nedges),
-      KOKKOS_CLASS_LAMBDA(Int iedge) {
+  omega_parallel_for(
+      "compute_edge_arrays", {m_nedges}, KOKKOS_CLASS_LAMBDA(Int iedge) {
         m_nedges_on_edge(iedge) = 10;
         m_dc_edge(iedge) = m_dc;
         m_dv_edge(iedge) = m_dc_edge(iedge) * sqrt(3) / 3;
@@ -384,9 +383,8 @@ void PlanarHexagonalMesh::compute_mesh_arrays() {
         m_lon_edge(iedge) = 0;
       });
 
-  parallel_for(
-      "compute_vertex_arrays", RangePolicy(0, m_nvertices),
-      KOKKOS_CLASS_LAMBDA(Int ivertex) {
+  omega_parallel_for(
+      "compute_vertex_arrays", {m_nvertices}, KOKKOS_CLASS_LAMBDA(Int ivertex) {
         m_lat_vertex(ivertex) = 0;
         m_lon_vertex(ivertex) = 0;
         m_area_triangle(ivertex) = m_dc * m_dc * sqrt(3) / 4;

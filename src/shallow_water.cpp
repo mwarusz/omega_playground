@@ -48,8 +48,8 @@ Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
   OMEGA_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
 
   Real total_mass;
-  parallel_reduce(
-      "compute_column_mass", RangePolicy(0, m_mesh->m_ncells),
+  omega_parallel_reduce(
+      "compute_column_mass", {m_mesh->m_ncells},
       KOKKOS_LAMBDA(Int icell, Real & column_mass) {
         for (Int k = 0; k < max_level_cell(icell); ++k) {
           column_mass += area_cell(icell) * h_cell(icell, k);
@@ -69,8 +69,8 @@ Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
   OMEGA_SCOPE(max_level_vertex_bot, m_mesh->m_max_level_vertex_bot);
 
   Real total_circulation;
-  parallel_reduce(
-      "compute_column_circulation", RangePolicy(0, m_mesh->m_nvertices),
+  omega_parallel_reduce(
+      "compute_column_circulation", {m_mesh->m_nvertices},
       KOKKOS_LAMBDA(Int ivertex, Real & column_circulation) {
         for (Int k = 0; k < max_level_vertex_bot(ivertex); ++k) {
           Real cir_i = -0;
@@ -140,10 +140,8 @@ void ShallowWaterModel::compute_cell_auxiliary_variables(
   OMEGA_SCOPE(norm_tr_cell, m_norm_tr_cell);
   OMEGA_SCOPE(ntracers, m_ntracers);
 
-  parallel_for(
-      "compute_cell_auxiliarys",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_ncells, m_mesh->m_nlayers},
-                       {tile1, tile2}),
+  omega_parallel_for(
+      "compute_cell_auxiliarys", {m_mesh->m_ncells, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int icell, Int k) {
         Real ke = -0;
         Real div = -0;
@@ -182,10 +180,8 @@ void ShallowWaterModel::compute_vertex_auxiliary_variables(
   OMEGA_SCOPE(norm_rvort_vertex, m_norm_rvort_vertex);
   OMEGA_SCOPE(norm_f_vertex, m_norm_f_vertex);
 
-  parallel_for(
-      "compute_vertex_auxiliarys",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_nvertices, m_mesh->m_nlayers},
-                       {tile1, tile2}),
+  omega_parallel_for(
+      "compute_vertex_auxiliarys", {m_mesh->m_nvertices, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int ivertex, Int k) {
         Real inv_area_triangle = 1._fp / area_triangle(ivertex);
         Real rcirc = -0;
@@ -224,10 +220,8 @@ void ShallowWaterModel::compute_edge_auxiliary_variables(
   OMEGA_SCOPE(norm_rvort_vertex, m_norm_rvort_vertex);
   OMEGA_SCOPE(norm_f_vertex, m_norm_f_vertex);
 
-  parallel_for(
-      "compute_edge_auxiliarys",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_nedges, m_mesh->m_nlayers},
-                       {tile1, tile2}),
+  omega_parallel_for(
+      "compute_edge_auxiliarys", {m_mesh->m_nedges, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int iedge, Int k) {
         Real h_mean = -0;
         for (Int j = 0; j < 2; ++j) {
@@ -266,10 +260,8 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   OMEGA_SCOPE(area_cell, m_mesh->m_area_cell);
 
   OMEGA_SCOPE(h_flux_edge, m_h_flux_edge);
-  parallel_for(
-      "compute_htend",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_ncells, m_mesh->m_nlayers},
-                       {tile1, tile2}),
+  omega_parallel_for(
+      "compute_h_tend", {m_mesh->m_ncells, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int icell, Int k) {
         Real accum = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -332,10 +324,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
     OMEGA_SCOPE(area_triangle, m_mesh->m_area_triangle);
     OMEGA_SCOPE(edge_sign_on_vertex, m_mesh->m_edge_sign_on_vertex);
 
-    parallel_for(
-        "compute_del2u_edge",
-        MDRangePolicy<2>({0, 0}, {m_mesh->m_nedges, m_mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "compute_del2u_edge", {m_mesh->m_nedges, m_mesh->m_nlayers},
         KOKKOS_LAMBDA(Int iedge, Int k) {
           Int icell0 = cells_on_edge(iedge, 0);
           Int icell1 = cells_on_edge(iedge, 1);
@@ -355,10 +345,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           del2u_edge(iedge, k) = del2u;
         });
 
-    parallel_for(
-        "compute_del2div_cell",
-        MDRangePolicy<2>({0, 0}, {m_mesh->m_ncells, m_mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "compute_del2div_cell", {m_mesh->m_ncells, m_mesh->m_nlayers},
         KOKKOS_LAMBDA(Int icell, Int k) {
           Real del2div = -0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -371,10 +359,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           del2div_cell(icell, k) = del2div;
         });
 
-    parallel_for(
-        "compute_del2rvort_vertex",
-        MDRangePolicy<2>({0, 0}, {m_mesh->m_nvertices, m_mesh->m_nlayers},
-                         {tile1, tile2}),
+    omega_parallel_for(
+        "compute_del2rvort_vertex", {m_mesh->m_nvertices, m_mesh->m_nlayers},
         KOKKOS_LAMBDA(Int ivertex, Int k) {
           Real del2rvort = -0;
           for (Int j = 0; j < 3; ++j) {
@@ -389,10 +375,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
-  parallel_for(
-      "compute_vtend",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_nedges, m_mesh->m_nlayers},
-                       {tile1, tile2}),
+  omega_parallel_for(
+      "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int iedge, Int k) {
         Real vn_tend = -0;
 
@@ -489,11 +473,9 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
   if (eddy_diff4 > 0) {
     tmp_tr_del2_cell = Real3d("tmp_tr_del2_cell", ntracers, m_mesh->m_ncells,
                               m_mesh->m_nlayers);
-    parallel_for(
+    omega_parallel_for(
         "compute_tmp_tr_del2_cell",
-        MDRangePolicy<3>({0, 0, 0},
-                         {ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
-                         {1, tile1, tile2}),
+        {ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
         KOKKOS_LAMBDA(Int l, Int icell, Int k) {
           Real tr_del2 = -0;
           for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -516,11 +498,8 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
         });
   }
 
-  parallel_for(
-      "compute_tr_tend",
-      MDRangePolicy<3>({0, 0, 0},
-                       {ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
-                       {1, tile1, tile2}),
+  omega_parallel_for(
+      "compute_tr_tend", {ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int l, Int icell, Int k) {
         Real tr_tend = -0;
 
@@ -582,8 +561,8 @@ Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
   OMEGA_SCOPE(grav, m_grav);
 
   Real total_energy;
-  parallel_reduce(
-      "compute_column_energy", RangePolicy(0, m_mesh->m_ncells),
+  omega_parallel_reduce(
+      "compute_column_energy", {m_mesh->m_ncells},
       KOKKOS_LAMBDA(Int icell, Real & column_energy) {
         for (Int k = 0; k < max_level_cell(icell); ++k) {
           Real K = 0;
@@ -619,9 +598,8 @@ void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   OMEGA_SCOPE(area_cell, m_mesh->m_area_cell);
   OMEGA_SCOPE(h0, m_h0);
 
-  parallel_for(
-      "compute_htend",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_ncells, m_mesh->m_nlayers}),
+  omega_parallel_for(
+      "compute_htend", {m_mesh->m_ncells, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int icell, Int k) {
         Real accum = -0;
         for (Int j = 0; j < nedges_on_cell(icell); ++j) {
@@ -650,9 +628,8 @@ void LinearShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   OMEGA_SCOPE(grav, m_grav);
   OMEGA_SCOPE(f_edge, m_f_edge);
 
-  parallel_for(
-      "compute_vtend",
-      MDRangePolicy<2>({0, 0}, {m_mesh->m_nedges, m_mesh->m_nlayers}),
+  omega_parallel_for(
+      "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int iedge, Int k) {
         Real vt = -0;
         for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
@@ -686,8 +663,8 @@ Real LinearShallowWaterModel::energy_integral(RealConst2d h_cell,
   OMEGA_SCOPE(h0, m_h0);
 
   Real total_energy;
-  parallel_reduce(
-      "compute_column_energy", RangePolicy(0, m_mesh->m_ncells),
+  omega_parallel_reduce(
+      "compute_column_energy", {m_mesh->m_ncells},
       KOKKOS_LAMBDA(Int icell, Real & column_energy) {
         for (Int k = 0; k < max_level_cell(icell); ++k) {
           Real K = 0;
