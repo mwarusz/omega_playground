@@ -22,6 +22,11 @@ using yakl::c::SimpleBounds;
 constexpr Int block_size = 256;
 using yakl::LaunchConfig;
 
+constexpr Int nlayers_max = 64;
+using yakl::InnerHandler;
+using yakl::c::parallel_inner;
+using yakl::c::parallel_outer;
+
 using Real1d = yakl::Array<Real, 1, yakl::memDevice, yakl::styleC>;
 using Real2d = yakl::Array<Real, 2, yakl::memDevice, yakl::styleC>;
 using Real3d = yakl::Array<Real, 3, yakl::memDevice, yakl::styleC>;
