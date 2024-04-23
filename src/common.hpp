@@ -2,6 +2,7 @@
 
 #include <Kokkos_Core.hpp>
 #include <cmath>
+#include <utility>
 
 namespace omega {
 
@@ -92,24 +93,24 @@ inline void omega_parallel_for(Int const (&upper_bounds)[N], const F &f,
 template <Int N, class F, class R>
 inline void
 omega_parallel_reduce(const std::string &label, Int const (&upper_bounds)[N],
-                      const F &f, R &reducer,
+                      const F &f, R &&reducer,
                       Int const (&tile)[N] = DefaultTile<N>::value) {
   if constexpr (N == 1) {
     const auto policy = RangePolicy(0, upper_bounds[0]);
-    parallel_reduce(label, policy, f, reducer);
+    parallel_reduce(label, policy, f, std::forward<R>(reducer));
   } else {
     const Int lower_bounds[N] = {0};
     const auto policy = MDRangePolicy<N>(lower_bounds, upper_bounds, tile);
-    parallel_reduce(label, policy, f, reducer);
+    parallel_reduce(label, policy, f, std::forward<R>(reducer));
   }
 }
 
 // without label
 template <Int N, class F, class R>
 inline void
-omega_parallel_reduce(Int const (&upper_bounds)[N], const F &f, R &reducer,
+omega_parallel_reduce(Int const (&upper_bounds)[N], const F &f, R &&reducer,
                       Int const (&tile)[N] = DefaultTile<N>::value) {
-  omega_parallel_reduce("", upper_bounds, f, tile, reducer);
+  omega_parallel_reduce("", upper_bounds, f, std::forward<R>(reducer), tile);
 }
 
 constexpr Int team_size = 1;
