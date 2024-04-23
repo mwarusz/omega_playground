@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "omega vector length")
 
-find_package(Kokkos REQUIRED)
+find_package(Kokkos REQUIRED PATHS ${Kokkos_PATH} NO_DEFAULT_PATH)
 
 set(OMEGA_SOURCES
   src/mpas_mesh.cpp
