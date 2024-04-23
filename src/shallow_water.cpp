@@ -2,23 +2,53 @@
 
 namespace omega {
 
-// Base
+// State
 
-ShallowWaterModelBase::ShallowWaterModelBase(MPASMesh *mesh,
+ShallowWaterState::ShallowWaterState(MPASMesh *mesh, Int ntracers)
+    : m_h_cell("h_cell", mesh->m_ncells, mesh->m_nlayers),
+      m_vn_edge("vn_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_tr_cell("tr_cell", ntracers, mesh->m_ncells, mesh->m_nlayers) {}
+
+ShallowWaterState::ShallowWaterState(const ShallowWaterModel &sw)
+    : ShallowWaterState(sw.m_mesh, sw.m_ntracers) {}
+
+ShallowWaterModel::ShallowWaterModel(MPASMesh *mesh,
                                              const ShallowWaterParams &params)
     : m_mesh(mesh), m_grav(params.m_grav),
       m_disable_h_tendency(params.m_disable_h_tendency),
       m_disable_vn_tendency(params.m_disable_vn_tendency),
       m_ntracers(params.m_ntracers), m_f_vertex("f_vertex", mesh->m_nvertices),
-      m_f_edge("f_edge", mesh->m_nedges) {
+      m_f_edge("f_edge", mesh->m_nedges),
+      m_drag_coeff(params.m_drag_coeff),
+      m_visc_del2(params.m_visc_del2), m_visc_del4(params.m_visc_del4),
+      m_eddy_diff2(params.m_eddy_diff2), m_eddy_diff4(params.m_eddy_diff4),
+      m_ke_cell("ke_cell", mesh->m_ncells, mesh->m_nlayers),
+      m_div_cell("div_cell", mesh->m_ncells, mesh->m_nlayers),
+      m_norm_tr_cell("norm_tr_cell", params.m_ntracers, mesh->m_ncells,
+                     mesh->m_nlayers),
+      m_h_flux_edge("h_flux_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_h_mean_edge("h_mean_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_h_drag_edge("h_drag_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_norm_rvort_edge("norm_rvort_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_norm_f_edge("norm_f_edge", mesh->m_nedges, mesh->m_nlayers),
+      m_rvort_vertex("rvort_vertex", mesh->m_nvertices, mesh->m_nlayers),
+      m_norm_rvort_vertex("norm_rvort_vertex", mesh->m_nvertices,
+                          mesh->m_nlayers),
+      m_norm_f_vertex("norm_f_vertex", mesh->m_nvertices, mesh->m_nlayers) {
+
   deep_copy(m_f_vertex, params.m_f0);
   deep_copy(m_f_edge, params.m_f0);
 }
 
-void ShallowWaterModelBase::compute_auxiliary_variables(
-    RealConst2d h_cell, RealConst2d vn_edge, RealConst3d tr_cell) const {}
+void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
+                                                    RealConst2d vn_edge,
+                                                    RealConst3d tr_cell) const {
+  compute_vertex_auxiliary_variables(h_cell, vn_edge, tr_cell);
+  compute_cell_auxiliary_variables(h_cell, vn_edge, tr_cell);
+  compute_edge_auxiliary_variables(h_cell, vn_edge, tr_cell);
+}
 
-void ShallowWaterModelBase::compute_tendency(const ShallowWaterState &tend,
+void ShallowWaterModel::compute_tendency(const ShallowWaterState &tend,
                                              const ShallowWaterState &state,
                                              Real t, AddMode add_mode) const {
 
@@ -43,7 +73,7 @@ void ShallowWaterModelBase::compute_tendency(const ShallowWaterState &tend,
                       state.m_vn_edge, t);
 }
 
-Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
+Real ShallowWaterModel::mass_integral(RealConst2d h_cell) const {
   OMEGA_SCOPE(area_cell, m_mesh->m_area_cell);
   OMEGA_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
 
@@ -59,7 +89,7 @@ Real ShallowWaterModelBase::mass_integral(RealConst2d h_cell) const {
   return total_mass;
 }
 
-Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
+Real ShallowWaterModel::circulation_integral(RealConst2d vn_edge) const {
 
   OMEGA_SCOPE(dc_edge, m_mesh->m_dc_edge);
   OMEGA_SCOPE(edges_on_vertex, m_mesh->m_edges_on_vertex);
@@ -85,45 +115,6 @@ Real ShallowWaterModelBase::circulation_integral(RealConst2d vn_edge) const {
       },
       total_circulation);
   return total_circulation;
-}
-
-// State
-
-ShallowWaterState::ShallowWaterState(MPASMesh *mesh, Int ntracers)
-    : m_h_cell("h_cell", mesh->m_ncells, mesh->m_nlayers),
-      m_vn_edge("vn_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_tr_cell("tr_cell", ntracers, mesh->m_ncells, mesh->m_nlayers) {}
-
-ShallowWaterState::ShallowWaterState(const ShallowWaterModelBase &sw)
-    : ShallowWaterState(sw.m_mesh, sw.m_ntracers) {}
-
-// Nonlinear
-
-ShallowWaterModel::ShallowWaterModel(MPASMesh *mesh,
-                                     const ShallowWaterParams &params)
-    : ShallowWaterModelBase(mesh, params), m_drag_coeff(params.m_drag_coeff),
-      m_visc_del2(params.m_visc_del2), m_visc_del4(params.m_visc_del4),
-      m_eddy_diff2(params.m_eddy_diff2), m_eddy_diff4(params.m_eddy_diff4),
-      m_ke_cell("ke_cell", mesh->m_ncells, mesh->m_nlayers),
-      m_div_cell("div_cell", mesh->m_ncells, mesh->m_nlayers),
-      m_norm_tr_cell("norm_tr_cell", params.m_ntracers, mesh->m_ncells,
-                     mesh->m_nlayers),
-      m_h_flux_edge("h_flux_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_h_mean_edge("h_mean_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_h_drag_edge("h_drag_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_norm_rvort_edge("norm_rvort_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_norm_f_edge("norm_f_edge", mesh->m_nedges, mesh->m_nlayers),
-      m_rvort_vertex("rvort_vertex", mesh->m_nvertices, mesh->m_nlayers),
-      m_norm_rvort_vertex("norm_rvort_vertex", mesh->m_nvertices,
-                          mesh->m_nlayers),
-      m_norm_f_vertex("norm_f_vertex", mesh->m_nvertices, mesh->m_nlayers) {}
-
-void ShallowWaterModel::compute_auxiliary_variables(RealConst2d h_cell,
-                                                    RealConst2d vn_edge,
-                                                    RealConst3d tr_cell) const {
-  compute_vertex_auxiliary_variables(h_cell, vn_edge, tr_cell);
-  compute_cell_auxiliary_variables(h_cell, vn_edge, tr_cell);
-  compute_edge_auxiliary_variables(h_cell, vn_edge, tr_cell);
 }
 
 void ShallowWaterModel::compute_cell_auxiliary_variables(
@@ -575,108 +566,6 @@ Real ShallowWaterModel::energy_integral(RealConst2d h_cell,
           column_energy += area_cell(icell) *
                            (grav * h_cell(icell, k) * h_cell(icell, k) / 2 +
                             h_cell(icell, k) * K);
-        }
-      },
-      total_energy);
-  return total_energy;
-}
-
-// Linear
-
-LinearShallowWaterModel::LinearShallowWaterModel(
-    MPASMesh *mesh, const LinearShallowWaterParams &params)
-    : ShallowWaterModelBase(mesh, params), m_h0(params.m_h0) {}
-
-void LinearShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
-                                                 RealConst2d h_cell,
-                                                 RealConst2d vn_edge,
-                                                 AddMode add_mode) const {
-  OMEGA_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
-  OMEGA_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
-  OMEGA_SCOPE(dv_edge, m_mesh->m_dv_edge);
-  OMEGA_SCOPE(edge_sign_on_cell, m_mesh->m_edge_sign_on_cell);
-  OMEGA_SCOPE(area_cell, m_mesh->m_area_cell);
-  OMEGA_SCOPE(h0, m_h0);
-
-  omega_parallel_for(
-      "compute_htend", {m_mesh->m_ncells, m_mesh->m_nlayers},
-      KOKKOS_LAMBDA(Int icell, Int k) {
-        Real accum = -0;
-        for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-          Int jedge = edges_on_cell(icell, j);
-          accum +=
-              dv_edge(jedge) * edge_sign_on_cell(icell, j) * vn_edge(jedge, k);
-        }
-        if (add_mode == AddMode::increment) {
-          h_tend_cell(icell, k) += -h0 * accum / area_cell(icell);
-        }
-        if (add_mode == AddMode::replace) {
-          h_tend_cell(icell, k) = -h0 * accum / area_cell(icell);
-        }
-      });
-}
-
-void LinearShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
-                                                  RealConst2d h_cell,
-                                                  RealConst2d vn_edge,
-                                                  AddMode add_mode) const {
-  OMEGA_SCOPE(nedges_on_edge, m_mesh->m_nedges_on_edge);
-  OMEGA_SCOPE(edges_on_edge, m_mesh->m_edges_on_edge);
-  OMEGA_SCOPE(weights_on_edge, m_mesh->m_weights_on_edge);
-  OMEGA_SCOPE(dc_edge, m_mesh->m_dc_edge);
-  OMEGA_SCOPE(cells_on_edge, m_mesh->m_cells_on_edge);
-  OMEGA_SCOPE(grav, m_grav);
-  OMEGA_SCOPE(f_edge, m_f_edge);
-
-  omega_parallel_for(
-      "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
-      KOKKOS_LAMBDA(Int iedge, Int k) {
-        Real vt = -0;
-        for (Int j = 0; j < nedges_on_edge(iedge); ++j) {
-          Int jedge = edges_on_edge(iedge, j);
-          vt += weights_on_edge(iedge, j) * vn_edge(jedge, k);
-        }
-
-        Int icell0 = cells_on_edge(iedge, 0);
-        Int icell1 = cells_on_edge(iedge, 1);
-        Real grad_h = (h_cell(icell1, k) - h_cell(icell0, k)) / dc_edge(iedge);
-
-        if (add_mode == AddMode::increment) {
-          vn_tend_edge(iedge, k) += f_edge(iedge) * vt - grav * grad_h;
-        }
-        if (add_mode == AddMode::replace) {
-          vn_tend_edge(iedge, k) = f_edge(iedge) * vt - grav * grad_h;
-        }
-      });
-}
-
-Real LinearShallowWaterModel::energy_integral(RealConst2d h_cell,
-                                              RealConst2d vn_edge) const {
-
-  OMEGA_SCOPE(nedges_on_cell, m_mesh->m_nedges_on_cell);
-  OMEGA_SCOPE(edges_on_cell, m_mesh->m_edges_on_cell);
-  OMEGA_SCOPE(dv_edge, m_mesh->m_dv_edge);
-  OMEGA_SCOPE(dc_edge, m_mesh->m_dc_edge);
-  OMEGA_SCOPE(area_cell, m_mesh->m_area_cell);
-  OMEGA_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
-  OMEGA_SCOPE(grav, m_grav);
-  OMEGA_SCOPE(h0, m_h0);
-
-  Real total_energy;
-  omega_parallel_reduce(
-      "compute_column_energy", {m_mesh->m_ncells},
-      KOKKOS_LAMBDA(Int icell, Real & column_energy) {
-        for (Int k = 0; k < max_level_cell(icell); ++k) {
-          Real K = 0;
-          for (Int j = 0; j < nedges_on_cell(icell); ++j) {
-            Int jedge = edges_on_cell(icell, j);
-            Real area_edge = dv_edge(jedge) * dc_edge(jedge);
-            K += area_edge * vn_edge(jedge, k) * vn_edge(jedge, k) / 4;
-          }
-          K /= area_cell(icell);
-          column_energy +=
-              area_cell(icell) *
-              (grav * h_cell(icell, k) * h_cell(icell, k) / 2 + h0 * K);
         }
       },
       total_energy);

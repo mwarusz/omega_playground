@@ -5,7 +5,6 @@ macro(add_omega_test testname)
 endmacro(add_omega_test)
 
 add_omega_test(operator_convergence)
-add_omega_test(linear_swe_convergence)
 add_omega_test(nonlinear_swe_convergence)
 add_omega_test(double_vortex)
 add_omega_test(tracer_advection_convergence)

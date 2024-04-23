@@ -5,7 +5,7 @@ using namespace std::string_literals;
 
 namespace omega {
 
-RK4Stepper::RK4Stepper(ShallowWaterModelBase &shallow_water)
+RK4Stepper::RK4Stepper(ShallowWaterModel &shallow_water)
     : TimeStepper(shallow_water), m_rka(nstages - 1), m_rkb(nstages),
       m_rkc(nstages - 1), m_tend(shallow_water), m_provis_state(shallow_water),
       m_old_state(shallow_water) {
