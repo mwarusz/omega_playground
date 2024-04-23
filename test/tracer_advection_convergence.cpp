@@ -40,7 +40,7 @@ Real run(Int nx) {
 
   ShallowWaterModel shallow_water(mesh.get(), params);
 
-  ShallowWaterState state(shallow_water);
+  ShallowWaterState state(mesh.get(), params);
 
   LSRKStepper stepper(shallow_water);
 

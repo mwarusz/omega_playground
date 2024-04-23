@@ -89,13 +89,12 @@ void run(Int nx, Real cfl) {
 
   ShallowWaterModel shallow_water(mesh.get(), params);
 
-  ShallowWaterState state(shallow_water);
+  ShallowWaterState state(mesh.get(), params);
 
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 200 * 1000;
-  Real dt =
-      cfl * mesh->m_dc / std::sqrt(shallow_water.m_grav * double_vortex.m_h0);
+  Real dt = cfl * mesh->m_dc / std::sqrt(params.m_grav * double_vortex.m_h0);
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
@@ -126,9 +125,9 @@ void run(Int nx, Real cfl) {
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
-  Real mass0 = shallow_water.mass_integral(h_cell);
-  Real cir0 = shallow_water.circulation_integral(vn_edge);
-  Real en0 = shallow_water.energy_integral(h_cell, vn_edge);
+  Real mass0 = mass_integral(state, shallow_water);
+  Real cir0 = circulation_integral(state, shallow_water);
+  Real en0 = energy_integral(state, shallow_water);
 
   // std::cout << "Initial h: " << yakl::intrinsics::minval(h_cell) << " "
   //           << yakl::intrinsics::maxval(h_cell) << std::endl;
@@ -145,9 +144,9 @@ void run(Int nx, Real cfl) {
   // std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
   //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
-  Real massf = shallow_water.mass_integral(h_cell);
-  Real cirf = shallow_water.circulation_integral(vn_edge);
-  Real enf = shallow_water.energy_integral(h_cell, vn_edge);
+  Real massf = mass_integral(state, shallow_water);
+  Real cirf = circulation_integral(state, shallow_water);
+  Real enf = energy_integral(state, shallow_water);
 
   Real mass_change = (massf - mass0) / mass0;
   Real cir_change = (cirf - cir0) / cir0;

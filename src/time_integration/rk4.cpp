@@ -1,4 +1,4 @@
-#include <time_stepper.hpp>
+#include "time_stepper.hpp"
 
 #include <string>
 using namespace std::string_literals;
@@ -7,8 +7,9 @@ namespace omega {
 
 RK4Stepper::RK4Stepper(ShallowWaterModel &shallow_water)
     : TimeStepper(shallow_water), m_rka(nstages - 1), m_rkb(nstages),
-      m_rkc(nstages - 1), m_tend(shallow_water), m_provis_state(shallow_water),
-      m_old_state(shallow_water) {
+      m_rkc(nstages - 1), m_tend(shallow_water.m_mesh, shallow_water.m_params),
+      m_provis_state(shallow_water.m_mesh, shallow_water.m_params),
+      m_old_state(shallow_water.m_mesh, shallow_water.m_params) {
 
   m_rka[0] = 1. / 2;
   m_rka[1] = 1. / 2;
@@ -39,7 +40,7 @@ void RK4Stepper::do_step(Real t, Real dt,
   OMEGA_SCOPE(h_provis_cell, m_provis_state.m_h_cell);
   OMEGA_SCOPE(vn_provis_edge, m_provis_state.m_vn_edge);
   OMEGA_SCOPE(tr_provis_cell, m_provis_state.m_tr_cell);
-  Int ntracers = m_shallow_water->m_ntracers;
+  Int ntracers = m_shallow_water->m_params.m_ntracers;
 
   deep_copy(h_old_cell, state.m_h_cell);
   deep_copy(vn_old_edge, state.m_vn_edge);

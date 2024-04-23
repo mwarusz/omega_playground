@@ -125,7 +125,7 @@ Real run(Int n) {
   ManufacturedShallowWaterModel shallow_water(mesh.get(),
                                               manufactured_solution);
 
-  ShallowWaterState state(shallow_water);
+  ShallowWaterState state(mesh.get(), shallow_water.m_params);
 
   RK4Stepper stepper(shallow_water);
 

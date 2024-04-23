@@ -46,7 +46,7 @@ Real error_gradient(const PlanarHexagonalMesh &mesh) {
         exact_grad_field(iedge) = nx * grad_x + ny * grad_y;
 
         exact_grad_field(iedge) -= grad_field(iedge);
-        exact_grad_field(iedge) = abs(exact_grad_field(iedge));
+        exact_grad_field(iedge) = std::abs(exact_grad_field(iedge));
       });
 
   Real errf;
@@ -101,7 +101,7 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
                                  cos(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
 
         exact_div_field(icell) -= div_field(icell);
-        exact_div_field(icell) = abs(exact_div_field(icell));
+        exact_div_field(icell) = std::abs(exact_div_field(icell));
       });
 
   Real errf;
@@ -156,7 +156,7 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
                                     sin(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
 
         exact_curl_field(ivertex) -= curl_field(ivertex);
-        exact_curl_field(ivertex) = abs(exact_curl_field(ivertex));
+        exact_curl_field(ivertex) = std::abs(exact_curl_field(ivertex));
       });
 
   Real errf;
@@ -210,7 +210,7 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
         recon_field(iedge) = accum;
 
         exact_recon_field(iedge) -= recon_field(iedge);
-        exact_recon_field(iedge) = abs(exact_recon_field(iedge));
+        exact_recon_field(iedge) = std::abs(exact_recon_field(iedge));
       });
 
   Real errf;

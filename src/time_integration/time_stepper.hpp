@@ -1,7 +1,7 @@
 #pragma once
 
 #include <common.hpp>
-#include <shallow_water.hpp>
+#include <model/shallow_water_model.hpp>
 
 namespace omega {
 

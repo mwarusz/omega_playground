@@ -15,7 +15,7 @@ constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
 
 constexpr Real pi = M_PI;
 
-#define OMEGA_SCOPE(a, b) auto &a = b
+#define OMEGA_SCOPE(a, b) const auto &a = b
 
 using Kokkos::deep_copy;
 using Kokkos::parallel_for;

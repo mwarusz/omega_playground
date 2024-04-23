@@ -99,13 +99,12 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
 
   ShallowWaterModel shallow_water(mesh.get(), params);
 
-  ShallowWaterState state(shallow_water);
+  ShallowWaterState state(mesh.get(), params);
 
   LSRKStepper stepper(shallow_water, nsteps == 1 ? 1 : 5);
 
   Real cfl = 0.1;
-  Real dt =
-      cfl * mesh->m_dc / std::sqrt(shallow_water.m_grav * double_vortex.m_h0);
+  Real dt = cfl * mesh->m_dc / std::sqrt(params.m_grav * double_vortex.m_h0);
   Int numberofsteps = nsteps;
 
   auto &h_cell = state.m_h_cell;

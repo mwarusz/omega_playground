@@ -1,7 +1,7 @@
 #pragma once
 
+#include "mpas_mesh.hpp"
 #include <common.hpp>
-#include <mpas_mesh.hpp>
 
 namespace omega {
 

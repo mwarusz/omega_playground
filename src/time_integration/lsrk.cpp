@@ -1,14 +1,15 @@
-#include <time_stepper.hpp>
+#include "time_stepper.hpp"
 
 namespace omega {
 
 LSRKStepper::LSRKStepper(ShallowWaterModel &shallow_water, Int nstages)
     : TimeStepper(shallow_water), m_nstages(nstages), m_rka(nstages),
-      m_rkb(nstages), m_rkc(nstages), m_tend(shallow_water) {
+      m_rkb(nstages), m_rkc(nstages),
+      m_tend(shallow_water.m_mesh, shallow_water.m_params) {
 
   deep_copy(m_tend.m_h_cell, 0);
   deep_copy(m_tend.m_vn_edge, 0);
-  if (shallow_water.m_ntracers > 0) {
+  if (shallow_water.m_params.m_ntracers > 0) {
     deep_copy(m_tend.m_tr_cell, 0);
   }
 
@@ -39,7 +40,7 @@ void LSRKStepper::do_step(Real t, Real dt,
   OMEGA_SCOPE(h_tend_cell, m_tend.m_h_cell);
   OMEGA_SCOPE(vn_tend_edge, m_tend.m_vn_edge);
   OMEGA_SCOPE(tr_tend_cell, m_tend.m_tr_cell);
-  Int ntracers = m_shallow_water->m_ntracers;
+  Int ntracers = m_shallow_water->m_params.m_ntracers;
 
   for (Int stage = 0; stage < m_nstages; ++stage) {
     Real rka_stage = m_rka[stage];
