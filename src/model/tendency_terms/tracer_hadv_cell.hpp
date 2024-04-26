@@ -39,7 +39,7 @@ struct TracerHorzAdvOnCell {
                h_flux_edge(jedge, k) * norm_tr_edge * v_edge(jedge, k);
     }
     Real inv_area_cell = 1._fp / m_area_cell(icell);
-    return accum * inv_area_cell;
+    return -accum * inv_area_cell;
   }
 
   TracerHorzAdvOnCell(const MPASMesh *mesh)

@@ -26,7 +26,7 @@ struct ThicknessHorzAdvOnCell {
                h_edge(jedge, k) * v_edge(jedge, k);
     }
     Real inv_area_cell = 1._fp / m_area_cell(icell);
-    return accum * inv_area_cell;
+    return -accum * inv_area_cell;
   }
 
   ThicknessHorzAdvOnCell(const MPASMesh *mesh)

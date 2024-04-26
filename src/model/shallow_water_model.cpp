@@ -54,7 +54,7 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
             add_mode == AddMode::increment ? h_tend_cell(icell, k) : 0;
 
         if (thickness_hadv_cell.m_enabled) {
-          h_tend_cell_accum -=
+          h_tend_cell_accum +=
               thickness_hadv_cell(icell, k, vn_edge, h_flux_edge);
         }
 
@@ -95,11 +95,11 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         }
 
         if (ke_grad_edge.m_enabled) {
-          vn_tend_edge_accum -= ke_grad_edge(iedge, k, ke_cell);
+          vn_tend_edge_accum += ke_grad_edge(iedge, k, ke_cell);
         }
 
         if (ssh_grad_edge.m_enabled) {
-          vn_tend_edge_accum -= ssh_grad_edge(iedge, k, h_cell);
+          vn_tend_edge_accum += ssh_grad_edge(iedge, k, h_cell);
         }
 
         if (vel_diff_edge.m_enabled) {
@@ -136,7 +136,7 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
             add_mode == AddMode::increment ? tr_tend_cell(l, icell, k) : 0;
 
         if (tracer_hadv_cell.m_enabled) {
-          tr_tend_cell_accum -=
+          tr_tend_cell_accum +=
               tracer_hadv_cell(l, icell, k, vn_edge, norm_tr_cell, h_flux_edge);
         }
 
