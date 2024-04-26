@@ -6,7 +6,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "omega vector length")
 
-find_package(Kokkos REQUIRED PATHS ${Kokkos_PATH} NO_DEFAULT_PATH)
+include(FetchContent)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+FetchContent_Declare(Kokkos
+  GIT_REPOSITORY https://github.com/kokkos/kokkos.git
+  GIT_TAG 4.3.00
+)
+FetchContent_MakeAvailable(Kokkos)
 
 add_library(omega)
 target_link_libraries(omega PUBLIC Kokkos::kokkos)

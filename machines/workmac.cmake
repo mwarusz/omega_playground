@@ -1,5 +1,0 @@
-set(CMAKE_CXX_COMPILER "g++-13" CACHE STRING "")
-set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
-set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "")
-set(Kokkos_PATH "/Users/mwarusz/e3sm/kokkos/" CACHE STRING "")
-#set(Kokkos_PATH "/Users/mwarusz/e3sm/kokkos-debug" CACHE STRING "")
