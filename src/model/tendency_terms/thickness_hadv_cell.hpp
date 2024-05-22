@@ -21,11 +21,11 @@ struct ThicknessHorzAdvOnCell {
                                   const RealConst2d &h_edge) const {
     Real accum = 0;
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
-      Int jedge = m_edges_on_cell(icell, j);
+      const Int jedge = m_edges_on_cell(icell, j);
       accum += m_dv_edge(jedge) * m_edge_sign_on_cell(icell, j) *
                h_edge(jedge, k) * v_edge(jedge, k);
     }
-    Real inv_area_cell = 1._fp / m_area_cell(icell);
+    const Real inv_area_cell = 1._fp / m_area_cell(icell);
     return -accum * inv_area_cell;
   }
 

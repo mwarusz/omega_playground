@@ -18,11 +18,7 @@ struct VelocityDiffusionOnEdge {
 
   Real m_visc_del2;
 
-  void enable(ShallowWaterAuxiliaryState &aux_state) {
-    m_enabled = true;
-    aux_state.m_vel_div_cell.enable(aux_state);
-    aux_state.m_rvort_vertex.enable(aux_state);
-  }
+  void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
   KOKKOS_FUNCTION Real operator()(Int iedge, Int k, const RealConst2d &div_cell,
                                   const RealConst2d &rvort_vertex) const {

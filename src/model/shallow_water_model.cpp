@@ -4,13 +4,13 @@ namespace omega {
 
 ShallowWaterModel::ShallowWaterModel(MPASMesh *mesh,
                                      const ShallowWaterParams &params)
-    : m_params(params), m_mesh(mesh), m_aux_state(mesh),
+    : m_params(params), m_mesh(mesh), m_aux_state(mesh, params.m_ntracers),
       m_thickness_hadv_cell(mesh), m_pv_flux_edge(mesh), m_ke_grad_edge(mesh),
       m_ssh_grad_edge(mesh, params.m_grav),
       m_vel_diff_edge(mesh, params.m_visc_del2),
       m_vel_hyperdiff_edge(mesh, params.m_visc_del4), m_tracer_hadv_cell(mesh),
       m_tracer_diff_cell(mesh, params.m_eddy_diff2),
-      m_tracer_hyperdiff_cell(mesh, params.m_eddy_diff4),
+      m_tracer_hyperdiff_cell(mesh, params.m_ntracers, params.m_eddy_diff4),
       m_f_vertex("f_vertex", mesh->m_nvertices),
       m_f_edge("f_edge", mesh->m_nedges) {
 
@@ -44,7 +44,8 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
                                            RealConst2d h_cell,
                                            RealConst2d vn_edge,
                                            AddMode add_mode) const {
-  OMEGA_SCOPE(h_flux_edge, m_aux_state.m_h_flux_edge.const_array());
+  const auto flux_h_edge =
+      const_view(m_aux_state.m_thickness_aux.m_flux_h_edge);
   OMEGA_SCOPE(thickness_hadv_cell, m_thickness_hadv_cell);
 
   omega_parallel_for(
@@ -55,7 +56,7 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
 
         if (thickness_hadv_cell.m_enabled) {
           h_tend_cell_accum +=
-              thickness_hadv_cell(icell, k, vn_edge, h_flux_edge);
+              thickness_hadv_cell(icell, k, vn_edge, flux_h_edge);
         }
 
         h_tend_cell(icell, k) = h_tend_cell_accum;
@@ -67,21 +68,44 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
                                             RealConst2d vn_edge,
                                             AddMode add_mode) const {
 
-  OMEGA_SCOPE(h_flux_edge, m_aux_state.m_h_flux_edge.const_array());
-  OMEGA_SCOPE(ke_cell, m_aux_state.m_ke_cell.const_array());
-  OMEGA_SCOPE(norm_rvort_edge, m_aux_state.m_norm_rvort_edge.const_array());
-  OMEGA_SCOPE(norm_f_edge, m_aux_state.m_norm_f_edge.const_array());
-  OMEGA_SCOPE(rvort_vertex, m_aux_state.m_rvort_vertex.const_array());
-  OMEGA_SCOPE(vel_div_cell, m_aux_state.m_vel_div_cell.const_array());
-  OMEGA_SCOPE(vel_del2_rvort_vertex,
-              m_aux_state.m_vel_del2_rvort_vertex.const_array());
-  OMEGA_SCOPE(vel_del2_div_cell, m_aux_state.m_vel_del2_div_cell.const_array());
+  const auto flux_h_edge =
+      const_view(m_aux_state.m_thickness_aux.m_flux_h_edge);
+  const auto rvort_vertex =
+      const_view(m_aux_state.m_vorticity_aux.m_rvort_vertex);
+  const auto norm_rvort_edge =
+      const_view(m_aux_state.m_vorticity_aux.m_norm_rvort_edge);
+  const auto norm_pvort_edge =
+      const_view(m_aux_state.m_vorticity_aux.m_norm_pvort_edge);
+  const auto ke_cell = const_view(m_aux_state.m_kinetic_aux.m_ke_cell);
+  const auto vel_div_cell =
+      const_view(m_aux_state.m_kinetic_aux.m_vel_div_cell);
 
   OMEGA_SCOPE(pv_flux_edge, m_pv_flux_edge);
   OMEGA_SCOPE(ke_grad_edge, m_ke_grad_edge);
   OMEGA_SCOPE(ssh_grad_edge, m_ssh_grad_edge);
   OMEGA_SCOPE(vel_diff_edge, m_vel_diff_edge);
   OMEGA_SCOPE(vel_hyperdiff_edge, m_vel_hyperdiff_edge);
+
+  if (vel_hyperdiff_edge.m_enabled) {
+    omega_parallel_for(
+        "compute_vel_del2", {m_mesh->m_nedges, m_mesh->m_nlayers},
+        KOKKOS_LAMBDA(Int iedge, Int k) {
+          vel_hyperdiff_edge.compute_vel_del2(iedge, k, vel_div_cell,
+                                              rvort_vertex);
+        });
+
+    omega_parallel_for(
+        "compute_vel_del2_rvort", {m_mesh->m_nvertices, m_mesh->m_nlayers},
+        KOKKOS_LAMBDA(Int ivertex, Int k) {
+          vel_hyperdiff_edge.compute_vel_del2_rvort(ivertex, k);
+        });
+
+    omega_parallel_for(
+        "compute_vel_del2_div", {m_mesh->m_ncells, m_mesh->m_nlayers},
+        KOKKOS_LAMBDA(Int icell, Int k) {
+          vel_hyperdiff_edge.compute_vel_del2_div(icell, k);
+        });
+  }
 
   omega_parallel_for(
       "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
@@ -90,8 +114,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
             add_mode == AddMode::increment ? vn_tend_edge(iedge, k) : 0;
 
         if (pv_flux_edge.m_enabled) {
-          vn_tend_edge_accum += pv_flux_edge(iedge, k, norm_rvort_edge,
-                                             norm_f_edge, h_flux_edge, vn_edge);
+          vn_tend_edge_accum += pv_flux_edge(
+              iedge, k, norm_rvort_edge, norm_pvort_edge, flux_h_edge, vn_edge);
         }
 
         if (ke_grad_edge.m_enabled) {
@@ -108,8 +132,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         }
 
         if (vel_hyperdiff_edge.m_enabled) {
-          vn_tend_edge_accum += vel_hyperdiff_edge(iedge, k, vel_del2_div_cell,
-                                                   vel_del2_rvort_vertex);
+          vn_tend_edge_accum += vel_hyperdiff_edge(iedge, k);
         }
 
         vn_tend_edge(iedge, k) = vn_tend_edge_accum;
@@ -120,14 +143,27 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
                                             RealConst3d tr_cell,
                                             RealConst2d vn_edge,
                                             AddMode add_mode) const {
-  OMEGA_SCOPE(h_flux_edge, m_aux_state.m_h_flux_edge.const_array());
-  OMEGA_SCOPE(h_mean_edge, m_aux_state.m_h_mean_edge.const_array());
-  OMEGA_SCOPE(norm_tr_cell, m_aux_state.m_norm_tr_cell.const_array());
-  OMEGA_SCOPE(tr_del2_cell, m_aux_state.m_tr_del2_cell.const_array());
+  const auto flux_h_edge =
+      const_view(m_aux_state.m_thickness_aux.m_mean_h_edge);
+  const auto mean_h_edge =
+      const_view(m_aux_state.m_thickness_aux.m_flux_h_edge);
+  const auto norm_tr_cell = const_view(m_aux_state.m_tracer_aux.m_norm_tr_cell);
   OMEGA_SCOPE(tracer_hadv_cell, m_tracer_hadv_cell);
   OMEGA_SCOPE(tracer_diff_cell, m_tracer_diff_cell);
   OMEGA_SCOPE(tracer_hyperdiff_cell, m_tracer_hyperdiff_cell);
 
+  if (tracer_hyperdiff_cell.m_enabled) {
+    omega_parallel_for(
+        "compute_tr_del2",
+        {m_params.m_ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
+        KOKKOS_LAMBDA(Int l, Int icell, Int k) {
+          tracer_hyperdiff_cell.compute_tracer_del2(l, icell, k, norm_tr_cell,
+                                                    mean_h_edge);
+        });
+  }
+
+  const auto tr_del2_cell =
+      const_view(tracer_hyperdiff_cell.m_tracer_del2_cell);
   omega_parallel_for(
       "compute_tr_tend",
       {m_params.m_ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
@@ -137,12 +173,12 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
 
         if (tracer_hadv_cell.m_enabled) {
           tr_tend_cell_accum +=
-              tracer_hadv_cell(l, icell, k, vn_edge, norm_tr_cell, h_flux_edge);
+              tracer_hadv_cell(l, icell, k, vn_edge, norm_tr_cell, flux_h_edge);
         }
 
         if (tracer_diff_cell.m_enabled) {
           tr_tend_cell_accum +=
-              tracer_diff_cell(l, icell, k, norm_tr_cell, h_mean_edge);
+              tracer_diff_cell(l, icell, k, norm_tr_cell, mean_h_edge);
         }
 
         if (tracer_hyperdiff_cell.m_enabled) {

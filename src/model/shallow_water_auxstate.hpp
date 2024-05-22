@@ -7,25 +7,12 @@
 namespace omega {
 
 struct ShallowWaterAuxiliaryState {
-  KineticEnergyOnCell m_ke_cell;
-  VelDivOnCell m_vel_div_cell;
-  VelDel2DivOnCell m_vel_del2_div_cell;
-  NormTracerOnCell m_norm_tr_cell;
-  TracerDel2OnCell m_tr_del2_cell;
+  ThicknessAuxVars m_thickness_aux;
+  VorticityAuxVars m_vorticity_aux;
+  KineticAuxVars m_kinetic_aux;
+  TracerAuxVars m_tracer_aux;
 
-  FluxThicknessOnEdge m_h_flux_edge;
-  MeanThicknessOnEdge m_h_mean_edge;
-  DragThicknessOnEdge m_h_drag_edge;
-  NormRelVortOnEdge m_norm_rvort_edge;
-  NormCoriolisOnEdge m_norm_f_edge;
-  VelocityDel2OnEdge m_vel_del2_edge;
-
-  RelVortOnVertex m_rvort_vertex;
-  VelDel2RelVortOnVertex m_vel_del2_rvort_vertex;
-  NormRelVortOnVertex m_norm_rvort_vertex;
-  NormCoriolisOnVertex m_norm_f_vertex;
-
-  ShallowWaterAuxiliaryState(const MPASMesh *mesh);
+  ShallowWaterAuxiliaryState(const MPASMesh *mesh, Int ntracers);
 
   void allocate(const MPASMesh *mesh, Int ntracers);
 

@@ -55,6 +55,12 @@ using IntConst2d = Kokkos::View<Int const **, Layout, MemSpace>;
 using IntConst3d = Kokkos::View<Int const ***, Layout, MemSpace>;
 using IntConst4d = Kokkos::View<Int const ****, Layout, MemSpace>;
 
+template <class V>
+inline Kokkos::View<typename V::const_data_type, Layout, MemSpace>
+const_view(const V &view) {
+  return view;
+}
+
 template <Int N> struct DefaultTile;
 
 template <> struct DefaultTile<1> {

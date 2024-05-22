@@ -16,11 +16,7 @@ struct TracerHorzAdvOnCell {
   Real1d m_dv_edge;
   Real1d m_area_cell;
 
-  void enable(ShallowWaterAuxiliaryState &aux_state) {
-    m_enabled = true;
-    aux_state.m_h_flux_edge.enable(aux_state);
-    aux_state.m_norm_tr_cell.enable(aux_state);
-  }
+  void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
   KOKKOS_FUNCTION Real operator()(Int l, Int icell, Int k,
                                   const RealConst2d &v_edge,

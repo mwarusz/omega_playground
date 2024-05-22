@@ -13,12 +13,7 @@ struct PotentialVortFluxOnEdge {
   Int2d m_edges_on_edge;
   Real2d m_weights_on_edge;
 
-  void enable(ShallowWaterAuxiliaryState &aux_state) {
-    m_enabled = true;
-    aux_state.m_norm_rvort_edge.enable(aux_state);
-    aux_state.m_norm_f_edge.enable(aux_state);
-    aux_state.m_h_flux_edge.enable(aux_state);
-  }
+  void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
   KOKKOS_FUNCTION Real operator()(Int iedge, Int k,
                                   const RealConst2d &norm_rvort_edge,
@@ -27,9 +22,9 @@ struct PotentialVortFluxOnEdge {
                                   const RealConst2d &vn_edge) const {
     Real qt = -0;
     for (Int j = 0; j < m_nedges_on_edge(iedge); ++j) {
-      Int jedge = m_edges_on_edge(iedge, j);
+      const Int jedge = m_edges_on_edge(iedge, j);
 
-      Real norm_vort = (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
+      const Real norm_vort = (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
                         norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
                        0.5_fp;
 
