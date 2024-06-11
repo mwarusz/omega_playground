@@ -47,7 +47,8 @@ struct TracerHyperDiffusionOnCell {
     m_tracer_del2_cell(l, icell, k) = tracer_del2_cell;
   }
 
-  KOKKOS_FUNCTION Real operator()(Int l, Int icell, Int k,
+  KOKKOS_FUNCTION void operator()(const Real3d &tr_tend_cell, Int l, Int icell,
+                                  Int k,
                                   const RealConst3d &tr_del2_cell) const {
     Real accum = 0;
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
@@ -65,7 +66,7 @@ struct TracerHyperDiffusionOnCell {
                m_mesh_scaling_del4(jedge) * grad_tr_del2_edge;
     }
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
-    return -accum * inv_area_cell;
+    tr_tend_cell(l, icell, k) -= accum * inv_area_cell;
   }
 
   TracerHyperDiffusionOnCell(const MPASMesh *mesh, Int ntracers,

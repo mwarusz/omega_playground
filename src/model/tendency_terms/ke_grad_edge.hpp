@@ -14,12 +14,13 @@ struct KineticEnergyGradOnEdge {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
-  KOKKOS_FUNCTION Real operator()(Int iedge, Int k,
+  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int k,
                                   const RealConst2d &ke_cell) const {
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
     const Real inv_dc_edge = 1._fp / m_dc_edge(iedge);
-    return -(ke_cell(icell1, k) - ke_cell(icell0, k)) * inv_dc_edge;
+    vn_tend_edge(iedge, k) -=
+        (ke_cell(icell1, k) - ke_cell(icell0, k)) * inv_dc_edge;
   }
 
   KineticEnergyGradOnEdge(const MPASMesh *mesh)

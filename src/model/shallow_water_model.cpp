@@ -51,15 +51,13 @@ void ShallowWaterModel::compute_h_tendency(Real2d h_tend_cell,
   omega_parallel_for(
       "compute_h_tend", {m_mesh->m_ncells, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int icell, Int k) {
-        Real h_tend_cell_accum =
-            add_mode == AddMode::increment ? h_tend_cell(icell, k) : 0;
-
-        if (thickness_hadv_cell.m_enabled) {
-          h_tend_cell_accum +=
-              thickness_hadv_cell(icell, k, vn_edge, flux_h_edge);
+        if (add_mode == AddMode::replace) {
+          h_tend_cell(icell, k) = 0;
         }
 
-        h_tend_cell(icell, k) = h_tend_cell_accum;
+        if (thickness_hadv_cell.m_enabled) {
+          thickness_hadv_cell(h_tend_cell, icell, k, vn_edge, flux_h_edge);
+        }
       });
 }
 
@@ -110,32 +108,30 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   omega_parallel_for(
       "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int iedge, Int k) {
-        Real vn_tend_edge_accum =
-            add_mode == AddMode::increment ? vn_tend_edge(iedge, k) : 0;
+        if (add_mode == AddMode::replace) {
+          vn_tend_edge(iedge, k) = 0;
+        }
 
         if (pv_flux_edge.m_enabled) {
-          vn_tend_edge_accum += pv_flux_edge(
-              iedge, k, norm_rvort_edge, norm_pvort_edge, flux_h_edge, vn_edge);
+          pv_flux_edge(vn_tend_edge, iedge, k, norm_rvort_edge, norm_pvort_edge,
+                       flux_h_edge, vn_edge);
         }
 
         if (ke_grad_edge.m_enabled) {
-          vn_tend_edge_accum += ke_grad_edge(iedge, k, ke_cell);
+          ke_grad_edge(vn_tend_edge, iedge, k, ke_cell);
         }
 
         if (ssh_grad_edge.m_enabled) {
-          vn_tend_edge_accum += ssh_grad_edge(iedge, k, h_cell);
+          ssh_grad_edge(vn_tend_edge, iedge, k, h_cell);
         }
 
         if (vel_diff_edge.m_enabled) {
-          vn_tend_edge_accum +=
-              vel_diff_edge(iedge, k, vel_div_cell, rvort_vertex);
+          vel_diff_edge(vn_tend_edge, iedge, k, vel_div_cell, rvort_vertex);
         }
 
         if (vel_hyperdiff_edge.m_enabled) {
-          vn_tend_edge_accum += vel_hyperdiff_edge(iedge, k);
+          vel_hyperdiff_edge(vn_tend_edge, iedge, k);
         }
-
-        vn_tend_edge(iedge, k) = vn_tend_edge_accum;
       });
 }
 
@@ -168,25 +164,23 @@ void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
       "compute_tr_tend",
       {m_params.m_ntracers, m_mesh->m_ncells, m_mesh->m_nlayers},
       KOKKOS_LAMBDA(Int l, Int icell, Int k) {
-        Real tr_tend_cell_accum =
-            add_mode == AddMode::increment ? tr_tend_cell(l, icell, k) : 0;
+        if (add_mode == AddMode::replace) {
+          tr_tend_cell(l, icell, k) = 0;
+        }
 
         if (tracer_hadv_cell.m_enabled) {
-          tr_tend_cell_accum +=
-              tracer_hadv_cell(l, icell, k, vn_edge, norm_tr_cell, flux_h_edge);
+          tracer_hadv_cell(tr_tend_cell, l, icell, k, vn_edge, norm_tr_cell,
+                           flux_h_edge);
         }
 
         if (tracer_diff_cell.m_enabled) {
-          tr_tend_cell_accum +=
-              tracer_diff_cell(l, icell, k, norm_tr_cell, mean_h_edge);
+          tracer_diff_cell(tr_tend_cell, l, icell, k, norm_tr_cell,
+                           mean_h_edge);
         }
 
         if (tracer_hyperdiff_cell.m_enabled) {
-          tr_tend_cell_accum +=
-              tracer_hyperdiff_cell(l, icell, k, tr_del2_cell);
+          tracer_hyperdiff_cell(tr_tend_cell, l, icell, k, tr_del2_cell);
         }
-
-        tr_tend_cell(l, icell, k) = tr_tend_cell_accum;
       });
 }
 

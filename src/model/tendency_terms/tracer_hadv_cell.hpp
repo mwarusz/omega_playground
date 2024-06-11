@@ -18,8 +18,8 @@ struct TracerHorzAdvOnCell {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
-  KOKKOS_FUNCTION Real operator()(Int l, Int icell, Int k,
-                                  const RealConst2d &v_edge,
+  KOKKOS_FUNCTION void operator()(const Real3d &tr_tend_cell, Int l, Int icell,
+                                  Int k, const RealConst2d &v_edge,
                                   const RealConst3d &norm_tr_cell,
                                   const RealConst2d &h_flux_edge) const {
     Real accum = 0;
@@ -35,7 +35,7 @@ struct TracerHorzAdvOnCell {
                h_flux_edge(jedge, k) * norm_tr_edge * v_edge(jedge, k);
     }
     Real inv_area_cell = 1._fp / m_area_cell(icell);
-    return -accum * inv_area_cell;
+    tr_tend_cell(l, icell, k) -= accum * inv_area_cell;
   }
 
   TracerHorzAdvOnCell(const MPASMesh *mesh)

@@ -75,7 +75,8 @@ struct VelocityHyperDiffusionOnEdge {
     m_vel_del2_div_cell(icell, k) = accum * inv_area_cell;
   }
 
-  KOKKOS_FUNCTION Real operator()(Int iedge, Int k) const {
+  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge,
+                                  Int k) const {
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
 
@@ -92,8 +93,8 @@ struct VelocityHyperDiffusionOnEdge {
           m_vel_del2_rvort_vertex(ivertex0, k)) *
              dv_edge_inv);
 
-    return -m_edge_mask(iedge, k) * m_visc_del4 * m_mesh_scaling_del4(iedge) *
-           del2u;
+    vn_tend_edge(iedge, k) -= m_edge_mask(iedge, k) * m_visc_del4 *
+                              m_mesh_scaling_del4(iedge) * del2u;
   }
 
   VelocityHyperDiffusionOnEdge(const MPASMesh *mesh, Real visc_del4)

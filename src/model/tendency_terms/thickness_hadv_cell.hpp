@@ -17,7 +17,8 @@ struct ThicknessHorzAdvOnCell {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
-  KOKKOS_FUNCTION Real operator()(Int icell, Int k, const RealConst2d &v_edge,
+  KOKKOS_FUNCTION void operator()(const Real2d &h_tend_cell, Int icell, Int k,
+                                  const RealConst2d &v_edge,
                                   const RealConst2d &h_edge) const {
     Real accum = 0;
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
@@ -26,7 +27,7 @@ struct ThicknessHorzAdvOnCell {
                h_edge(jedge, k) * v_edge(jedge, k);
     }
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
-    return -accum * inv_area_cell;
+    h_tend_cell(icell, k) -= accum * inv_area_cell;
   }
 
   ThicknessHorzAdvOnCell(const MPASMesh *mesh)

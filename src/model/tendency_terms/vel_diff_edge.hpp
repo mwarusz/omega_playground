@@ -20,7 +20,8 @@ struct VelocityDiffusionOnEdge {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
-  KOKKOS_FUNCTION Real operator()(Int iedge, Int k, const RealConst2d &div_cell,
+  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int k,
+                                  const RealConst2d &div_cell,
                                   const RealConst2d &rvort_vertex) const {
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
@@ -35,8 +36,8 @@ struct VelocityDiffusionOnEdge {
         ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
          (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) * dv_edge_inv);
 
-    return m_edge_mask(iedge, k) * m_visc_del2 * m_mesh_scaling_del2(iedge) *
-           del2u;
+    vn_tend_edge(iedge, k) += m_edge_mask(iedge, k) * m_visc_del2 *
+                              m_mesh_scaling_del2(iedge) * del2u;
   }
 
   VelocityDiffusionOnEdge(const MPASMesh *mesh, Real visc_del2)
