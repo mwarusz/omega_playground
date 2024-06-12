@@ -4,6 +4,7 @@
 #include <Kokkos_SIMD.hpp>
 #include <cmath>
 #include <utility>
+#include <iostream>
 
 namespace omega {
 

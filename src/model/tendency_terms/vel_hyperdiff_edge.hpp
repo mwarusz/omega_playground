@@ -34,7 +34,7 @@ struct VelocityHyperDiffusionOnEdge {
   KOKKOS_FUNCTION void compute_vel_del2(Int iedge, Int kchunk,
                                         const RealConst2d &div_cell,
                                         const RealConst2d &rvort_vertex) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
 
@@ -56,7 +56,7 @@ struct VelocityHyperDiffusionOnEdge {
   }
 
   KOKKOS_FUNCTION void compute_vel_del2_rvort(Int ivertex, Int kchunk) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Real inv_area_triangle = 1._fp / m_area_triangle(ivertex);
 
     Real rvort[vector_length] = {0};
@@ -76,7 +76,7 @@ struct VelocityHyperDiffusionOnEdge {
   }
 
   KOKKOS_FUNCTION void compute_vel_del2_div(Int icell, Int kchunk) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
 
     Real accum[vector_length] = {0};

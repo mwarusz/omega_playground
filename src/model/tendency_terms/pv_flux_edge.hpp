@@ -20,7 +20,7 @@ struct PotentialVortFluxOnEdge {
                                   const RealConst2d &norm_f_edge,
                                   const RealConst2d &h_flux_edge,
                                   const RealConst2d &vn_edge) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
 
     Real qt[vector_length] = {0};
     for (Int j = 0; j < m_nedges_on_edge(iedge); ++j) {

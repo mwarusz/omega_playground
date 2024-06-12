@@ -26,7 +26,7 @@ struct TracerHyperDiffusionOnCell {
   KOKKOS_FUNCTION void
   compute_tracer_del2(Int l, Int icell, Int kchunk, const RealConst3d &norm_tr_cell,
                       const RealConst2d &h_mean_edge) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
 
     Real tracer_del2_cell[vector_length] = {0};
@@ -59,7 +59,7 @@ struct TracerHyperDiffusionOnCell {
   KOKKOS_FUNCTION void operator()(const Real3d &tr_tend_cell, Int l, Int icell,
                                   Int kchunk,
                                   const RealConst3d &tr_del2_cell) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
 
     Real accum[vector_length] = {0};

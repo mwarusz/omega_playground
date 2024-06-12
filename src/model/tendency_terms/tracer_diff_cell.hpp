@@ -25,7 +25,7 @@ struct TracerDiffusionOnCell {
   KOKKOS_FUNCTION void operator()(const Real3d &tr_tend_cell, Int l, Int icell,
                                   Int kchunk, const RealConst3d &norm_tr_cell,
                                   const RealConst2d &h_mean_edge) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
     
     Real accum[vector_length] = {0};

@@ -21,7 +21,7 @@ struct ThicknessHorzAdvOnCell {
                                   const RealConst2d &v_edge,
                                   const RealConst2d &h_edge) const {
 
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
     
     Real accum[vector_length] = {0};

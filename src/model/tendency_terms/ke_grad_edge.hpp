@@ -16,7 +16,7 @@ struct KineticEnergyGradOnEdge {
 
   KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
                                   const RealConst2d &ke_cell) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
     const Real inv_dc_edge = 1._fp / m_dc_edge(iedge);

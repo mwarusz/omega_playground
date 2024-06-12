@@ -23,7 +23,7 @@ struct VelocityDiffusionOnEdge {
   KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
                                   const RealConst2d &div_cell,
                                   const RealConst2d &rvort_vertex) const {
-    const Int kstart = kchunk * vector_size;
+    const Int kstart = kchunk * vector_length;
 
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
