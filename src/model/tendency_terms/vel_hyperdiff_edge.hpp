@@ -31,9 +31,10 @@ struct VelocityHyperDiffusionOnEdge {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
-  KOKKOS_FUNCTION void compute_vel_del2(Int iedge, Int k,
+  KOKKOS_FUNCTION void compute_vel_del2(Int iedge, Int kchunk,
                                         const RealConst2d &div_cell,
                                         const RealConst2d &rvort_vertex) const {
+    const Int kstart = kchunk * vector_size;
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
 
@@ -44,35 +45,54 @@ struct VelocityHyperDiffusionOnEdge {
     const Real dv_edge_inv =
         1._fp / std::max(m_dv_edge(iedge), 0.25_fp * m_dc_edge(iedge)); // huh
 
-    const Real del2u =
-        ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
-         (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) * dv_edge_inv);
+    for (Int kvec = 0; kvec < vector_length; ++kvec) {
+      const Int k = kstart + kvec;
+      const Real del2u =
+          ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
+           (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) * dv_edge_inv);
 
-    m_vel_del2_edge(iedge, k) = del2u;
+      m_vel_del2_edge(iedge, k) = del2u;
+    }
   }
 
-  KOKKOS_FUNCTION void compute_vel_del2_rvort(Int ivertex, Int k) const {
-    Real rvort = -0;
-    for (Int j = 0; j < 3; ++j) {
-      Int jedge = m_edges_on_vertex(ivertex, j);
-      rvort += m_dc_edge(jedge) * m_edge_sign_on_vertex(ivertex, j) *
-               m_vel_del2_edge(jedge, k);
-    }
+  KOKKOS_FUNCTION void compute_vel_del2_rvort(Int ivertex, Int kchunk) const {
+    const Int kstart = kchunk * vector_size;
     const Real inv_area_triangle = 1._fp / m_area_triangle(ivertex);
-    rvort *= inv_area_triangle;
 
-    m_vel_del2_rvort_vertex(ivertex, k) = rvort;
+    Real rvort[vector_length] = {0};
+    for (Int j = 0; j < 3; ++j) {
+      const Int jedge = m_edges_on_vertex(ivertex, j);
+      for (Int kvec = 0; kvec < vector_length; ++kvec) {
+        const Int k = kstart + kvec;
+        rvort[kvec] += m_dc_edge(jedge) * inv_area_triangle * m_edge_sign_on_vertex(ivertex, j) *
+                 m_vel_del2_edge(jedge, k);
+      }
+    }
+
+    for (Int kvec = 0; kvec < vector_length; ++kvec) {
+      const Int k = kstart + kvec;
+      m_vel_del2_rvort_vertex(ivertex, k) = rvort[kvec];
+    }
   }
 
-  KOKKOS_FUNCTION void compute_vel_del2_div(Int icell, Int k) const {
-    Real accum = 0;
+  KOKKOS_FUNCTION void compute_vel_del2_div(Int icell, Int kchunk) const {
+    const Int kstart = kchunk * vector_size;
+    const Real inv_area_cell = 1._fp / m_area_cell(icell);
+
+    Real accum[vector_length] = {0};
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
-      Int jedge = m_edges_on_cell(icell, j);
-      accum += m_dv_edge(jedge) * m_edge_sign_on_cell(icell, j) *
-               m_vel_del2_edge(jedge, k);
+      const Int jedge = m_edges_on_cell(icell, j);
+      for (Int kvec = 0; kvec < vector_length; ++kvec) {
+        const Int k = kstart + kvec;
+        accum[kvec] += m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
+                 m_vel_del2_edge(jedge, k);
+      }
     }
-    Real inv_area_cell = 1._fp / m_area_cell(icell);
-    m_vel_del2_div_cell(icell, k) = accum * inv_area_cell;
+    
+    for (Int kvec = 0; kvec < vector_length; ++kvec) {
+      const Int k = kstart + kvec;
+      m_vel_del2_div_cell(icell, k) = accum[kvec];
+    }
   }
 
   KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge,

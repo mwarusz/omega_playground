@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Kokkos_Core.hpp>
+#include <Kokkos_SIMD.hpp>
 #include <cmath>
 #include <utility>
 
@@ -11,7 +12,8 @@ using Int = int;
 
 KOKKOS_INLINE_FUNCTION constexpr Real operator""_fp(long double x) { return x; }
 
-constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
+//constexpr Int vector_length = Kokkos::Experimental::native_simd<Real>::size(); 
+constexpr Int vector_length = 1; 
 
 constexpr Real pi = M_PI;
 
