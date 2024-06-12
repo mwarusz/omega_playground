@@ -19,6 +19,10 @@ target_link_libraries(omega PUBLIC Kokkos::kokkos)
 if (${OMEGA_NO_SIMD})
   target_compile_definitions(omega PUBLIC OMEGA_NO_SIMD=1)
 endif()
+if (${OMEGA_NO_INNER_IF})
+  target_compile_definitions(omega PUBLIC OMEGA_NO_INNER_IF=1)
+endif()
+
 
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
