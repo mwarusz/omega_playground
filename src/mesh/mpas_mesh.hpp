@@ -8,6 +8,7 @@ struct MPASMesh {
   static constexpr Int maxedges = 6;
 
   Int m_nlayers;
+  Int m_nlayers_vec;
   Int m_ncells;
   Int m_nedges;
   Int m_nvertices;

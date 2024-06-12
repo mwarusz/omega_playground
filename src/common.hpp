@@ -12,8 +12,11 @@ using Int = int;
 
 KOKKOS_INLINE_FUNCTION constexpr Real operator""_fp(long double x) { return x; }
 
-//constexpr Int vector_length = Kokkos::Experimental::native_simd<Real>::size(); 
+#ifdef OMEGA_NO_SIMD
 constexpr Int vector_length = 1; 
+#else
+constexpr Int vector_length = Kokkos::Experimental::native_simd<Real>::size(); 
+#endif
 
 constexpr Real pi = M_PI;
 

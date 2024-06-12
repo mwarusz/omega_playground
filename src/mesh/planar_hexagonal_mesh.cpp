@@ -9,6 +9,7 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
     : m_nx(nx), m_ny(ny), m_dc(dc) {
 
   m_nlayers = std::ceil(Real(nlayers) / vector_length) * vector_length;
+  m_nlayers_vec = std::ceil(Real(nlayers) / vector_length);
   m_ncells = nx * ny;
   m_nedges = 3 * m_ncells;
   m_nvertices = 2 * m_ncells;

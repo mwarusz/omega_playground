@@ -16,7 +16,9 @@ FetchContent_MakeAvailable(Kokkos)
 
 add_library(omega)
 target_link_libraries(omega PUBLIC Kokkos::kokkos)
-target_compile_definitions(omega PUBLIC OMEGA_VECTOR_LENGTH=${OMEGA_VECTOR_LENGTH})
+if (${OMEGA_NO_SIMD})
+  target_compile_definitions(omega PUBLIC OMEGA_NO_SIMD=1)
+endif()
 
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src

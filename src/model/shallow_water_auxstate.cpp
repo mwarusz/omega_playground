@@ -21,7 +21,7 @@ void ShallowWaterAuxiliaryState::compute(RealConst2d h_cell,
   const auto &tracer_aux = m_tracer_aux;
 
   omega_parallel_for(
-      "compute_vertex_auxiliarys", {mesh->m_nvertices, mesh->m_nlayers},
+      "compute_vertex_auxiliarys", {mesh->m_nvertices, mesh->m_nlayers_vec},
       KOKKOS_LAMBDA(Int ivertex, Int k) {
         vorticity_aux.compute_vort_vertex(ivertex, k, h_cell, vn_edge,
                                           f_vertex);
@@ -30,7 +30,7 @@ void ShallowWaterAuxiliaryState::compute(RealConst2d h_cell,
   const Int ntracers = tr_cell.extent(0);
 
   omega_parallel_for(
-      "compute_cell_auxiliarys", {mesh->m_ncells, mesh->m_nlayers},
+      "compute_cell_auxiliarys", {mesh->m_ncells, mesh->m_nlayers_vec},
       KOKKOS_LAMBDA(Int icell, Int k) {
         kinetic_aux.compute_kinetic_cell(icell, k, vn_edge);
         for (Int l = 0; l < ntracers; ++l) {
@@ -42,7 +42,7 @@ void ShallowWaterAuxiliaryState::compute(RealConst2d h_cell,
   const auto vel_div_cell = const_view(kinetic_aux.m_vel_div_cell);
 
   omega_parallel_for(
-      "compute_edge_auxiliarys", {mesh->m_nedges, mesh->m_nlayers},
+      "compute_edge_auxiliarys", {mesh->m_nedges, mesh->m_nlayers_vec},
       KOKKOS_LAMBDA(Int iedge, Int k) {
         thickness_aux.compute_thickness_edge(iedge, k, h_cell);
         vorticity_aux.compute_vort_edge(iedge, k);

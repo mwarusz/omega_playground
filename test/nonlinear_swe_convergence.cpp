@@ -83,24 +83,21 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
     OMEGA_SCOPE(x_cell, m_mesh->m_x_cell);
     OMEGA_SCOPE(y_cell, m_mesh->m_y_cell);
     OMEGA_SCOPE(max_level_cell, m_mesh->m_max_level_cell);
-    parallel_for(
-        "manufactured_htend", RangePolicy(0, m_mesh->m_ncells),
-        KOKKOS_LAMBDA(Int icell) {
-          for (Int k = 0; k < max_level_cell(icell); ++k) {
+    omega_parallel_for(
+        "manufactured_htend", {m_mesh->m_ncells, m_mesh->m_nlayers},
+        KOKKOS_LAMBDA(Int icell, Int k) {
             Real x = x_cell(icell);
             Real y = y_cell(icell);
             h_tend_cell(icell, k) += manufactured_solution.h_tend(x, y, t);
-          }
         });
 
     OMEGA_SCOPE(x_edge, m_mesh->m_x_edge);
     OMEGA_SCOPE(y_edge, m_mesh->m_y_edge);
     OMEGA_SCOPE(angle_edge, m_mesh->m_angle_edge);
     OMEGA_SCOPE(max_level_edge_top, m_mesh->m_max_level_edge_top);
-    parallel_for(
-        "manufactured_vtend", RangePolicy(0, m_mesh->m_nedges),
-        KOKKOS_LAMBDA(Int iedge) {
-          for (Int k = 0; k < max_level_edge_top(iedge); ++k) {
+    omega_parallel_for(
+        "manufactured_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
+        KOKKOS_LAMBDA(Int iedge, Int k) {
             Real x = x_edge(iedge);
             Real y = y_edge(iedge);
 
@@ -111,7 +108,6 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
             Real vy_tend = manufactured_solution.vy_tend(x, y, t);
 
             vn_tend_edge(iedge, k) += nx * vx_tend + ny * vy_tend;
-          }
         });
   }
 };
