@@ -17,6 +17,34 @@ struct ThicknessHorzAdvOnCell {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
+#ifdef OMEGA_KOKKOS_SIMD
+  KOKKOS_FUNCTION void operator()(const Real2d &h_tend_cell, Int icell, Int kchunk,
+                                  const RealConst2d &vn_edge,
+                                  const RealConst2d &h_flux_edge) const {
+
+    const Int kstart = kchunk * vector_length;
+    const Real inv_area_cell = 1._fp / m_area_cell(icell);
+    
+    Vec accum = 0;
+    for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
+      const Int jedge = m_edges_on_cell(icell, j);
+
+      Vec vn_jedge;
+      vn_jedge.copy_from(&vn_edge(jedge, kstart), VecTag());
+      
+      Vec h_flux_jedge;
+      h_flux_jedge.copy_from(&h_flux_edge(jedge, kstart), VecTag());
+
+      accum -= m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
+               h_flux_jedge * vn_jedge;
+    }
+
+    Vec h_tend_icell;
+    h_tend_icell.copy_from(&h_tend_cell(icell, kstart), VecTag());
+    h_tend_icell += accum;
+    h_tend_icell.copy_to(&h_tend_cell(icell, kstart), VecTag());
+  }
+#else
   KOKKOS_FUNCTION void operator()(const Real2d &h_tend_cell, Int icell, Int kchunk,
                                   const RealConst2d &v_edge,
                                   const RealConst2d &h_edge) const {
@@ -39,6 +67,7 @@ struct ThicknessHorzAdvOnCell {
       h_tend_cell(icell, k) += accum[kvec];
     }
   }
+#endif
 
   ThicknessHorzAdvOnCell(const MPASMesh *mesh)
       : m_nedges_on_cell(mesh->m_nedges_on_cell),
