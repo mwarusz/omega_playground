@@ -18,6 +18,44 @@ struct TracerHorzAdvOnCell {
 
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
+#ifdef OMEGA_KOKKOS_SIMD
+  KOKKOS_FUNCTION void operator()(const Real3d &tr_tend_cell, Int l, Int icell,
+                                  Int kchunk, const RealConst2d &vn_edge,
+                                  const RealConst3d &norm_tr_cell,
+                                  const RealConst2d &h_flux_edge) const {
+    const Int kstart = kchunk * vector_length;
+    const Real inv_area_cell = 1._fp / m_area_cell(icell);
+
+    Vec accum = 0;
+    for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
+      const Int jedge = m_edges_on_cell(icell, j);
+
+      const Int jcell0 = m_cells_on_edge(jedge, 0);
+      const Int jcell1 = m_cells_on_edge(jedge, 1);
+
+      Vec norm_tr_jcell0;
+      norm_tr_jcell0.copy_from(&norm_tr_cell(l, jcell0, kstart), VecTag());
+      Vec norm_tr_jcell1;
+      norm_tr_jcell1.copy_from(&norm_tr_cell(l, jcell1, kstart), VecTag());
+
+      const Vec norm_tr_jedge = 0.5_fp * (norm_tr_jcell0 + norm_tr_jcell1);
+
+      Vec h_flux_jedge;
+      h_flux_jedge.copy_from(&h_flux_edge(jedge, kstart), VecTag());
+      
+      Vec vn_jedge;
+      vn_jedge.copy_from(&vn_edge(jedge, kstart), VecTag());
+
+      accum -= m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
+               h_flux_jedge * norm_tr_jedge * vn_jedge;
+    }
+
+    Vec tr_tend_icell;
+    tr_tend_icell.copy_from(&tr_tend_cell(l, icell, kstart), VecTag());
+    tr_tend_icell += accum;
+    tr_tend_icell.copy_to(&tr_tend_cell(l, icell, kstart), VecTag());
+  }
+#else
   KOKKOS_FUNCTION void operator()(const Real3d &tr_tend_cell, Int l, Int icell,
                                   Int kchunk, const RealConst2d &v_edge,
                                   const RealConst3d &norm_tr_cell,
@@ -46,6 +84,7 @@ struct TracerHorzAdvOnCell {
       tr_tend_cell(l, icell, k) += accum[kvec];
     }
   }
+#endif
 
   TracerHorzAdvOnCell(const MPASMesh *mesh)
       : m_nedges_on_cell(mesh->m_nedges_on_cell),
