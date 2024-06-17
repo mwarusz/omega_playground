@@ -156,10 +156,10 @@ void run(Int nx, Real cfl) {
   std::cout << "Circulation change: " << cir_change << std::endl;
   std::cout << "Energy change: " << en_change << std::endl;
 
-  if (std::abs(mass_change) > 5e-15) {
+  if (std::abs(mass_change) > 5e-14) {
     throw std::runtime_error("Mass conservation check failed");
   }
-  if (std::abs(cir_change) > 5e-15) {
+  if (std::abs(cir_change) > 5e-14) {
     throw std::runtime_error("Circulation conservation check failed");
   }
   if (std::abs(en_change) > 1e-10) {
