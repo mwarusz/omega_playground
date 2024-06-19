@@ -6,6 +6,13 @@
 #include <utility>
 #include <iostream>
 
+#ifdef OMEGA_USE_CALIPER
+#include <caliper/cali.h>
+#else
+#define CALI_MARK_BEGIN(X)
+#define CALI_MARK_END(X)
+#endif
+
 namespace omega {
 
 using Real = double;
