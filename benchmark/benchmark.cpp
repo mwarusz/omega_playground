@@ -149,7 +149,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   cudaProfilerStart();
 #endif
 
-  CALI_MARK_BEGIN("time_integration");
+  timer_start("time_integration");
 
   Kokkos::fence();
   auto ts = std::chrono::steady_clock::now();
@@ -161,7 +161,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   auto te = std::chrono::steady_clock::now();
   auto time_loop_second = std::chrono::duration<double>(te - ts).count();
   
-  CALI_MARK_END("time_integration");
+  timer_end("time_integration");
 
 #ifdef BENCHMARK_PROFILE_CUDA
   cudaProfilerStop();

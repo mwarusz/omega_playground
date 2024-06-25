@@ -6,13 +6,6 @@
 #include <utility>
 #include <iostream>
 
-#ifdef OMEGA_USE_CALIPER
-#include <caliper/cali.h>
-#else
-#define CALI_MARK_BEGIN(X)
-#define CALI_MARK_END(X)
-#endif
-
 namespace omega {
 
 using Real = double;
@@ -41,6 +34,8 @@ using Kokkos::TeamThreadRange;
 using Kokkos::ThreadVectorRange;
 
 using ExecSpace = Kokkos::DefaultExecutionSpace;
+constexpr bool exec_is_gpu = !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
+
 using MemSpace = ExecSpace::memory_space;
 using Layout = Kokkos::LayoutRight;
 
@@ -158,5 +153,26 @@ inline void omega_parallel_for_inner(Int upper_bound, const F &f,
   const auto policy = ThreadVectorRange(team_member, upper_bound);
   parallel_for(policy, f);
 }
+
+#ifdef OMEGA_USE_CALIPER
+#include <caliper/cali.h>
+inline void timer_start(char const * label) {
+  if constexpr (exec_is_gpu) {
+    Kokkos::fence();
+  }
+  cali_begin_region(label);
+}
+
+inline void timer_end(char const * label) {
+  if constexpr (exec_is_gpu) {
+    Kokkos::fence();
+  }
+  cali_end_region(label);
+}
+#else
+  inline void timer_start(char const * label) {}
+  inline void timer_end(char const * label) {}
+#endif
+
 
 } // namespace omega

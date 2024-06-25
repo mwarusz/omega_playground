@@ -312,36 +312,36 @@ void ShallowWaterModel::compute_tendency(const ShallowWaterState &tend,
                                          const ShallowWaterState &state, Real t,
                                          AddMode add_mode) const {
 
-  CALI_MARK_BEGIN("auxstate");
+  timer_start("auxstate");
   m_aux_state.compute(state.m_h_cell, state.m_vn_edge, state.m_tr_cell,
                       m_f_vertex, m_mesh);
-  CALI_MARK_END("auxstate");
+  timer_end("auxstate");
 
-  CALI_MARK_BEGIN("tendencies");
+  timer_start("tendencies");
   if (!m_params.m_disable_h_tendency) {
-    CALI_MARK_BEGIN("h_tendency");
+    timer_start("h_tendency");
     compute_h_tendency(tend.m_h_cell, state.m_h_cell, state.m_vn_edge,
                        add_mode);
-    CALI_MARK_END("h_tendency");
+    timer_end("h_tendency");
   }
 
   if (!m_params.m_disable_vn_tendency) {
-    CALI_MARK_BEGIN("vn_tendency");
+    timer_start("vn_tendency");
     compute_vn_tendency(tend.m_vn_edge, state.m_h_cell, state.m_vn_edge,
                         add_mode);
-    CALI_MARK_END("vn_tendency");
+    timer_end("vn_tendency");
   }
 
   if (m_params.m_ntracers > 0) {
-    CALI_MARK_BEGIN("tr_tendency");
+    timer_start("tr_tendency");
     compute_tr_tendency(tend.m_tr_cell, state.m_tr_cell, state.m_vn_edge,
                         add_mode);
-    CALI_MARK_END("tr_tendency");
+    timer_end("tr_tendency");
   }
 
   additional_tendency(tend.m_h_cell, tend.m_vn_edge, state.m_h_cell,
                       state.m_vn_edge, t);
-  CALI_MARK_END("tendencies");
+  timer_end("tendencies");
 }
 
 } // namespace omega
