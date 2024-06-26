@@ -20,14 +20,14 @@ Real error_gradient(const PlanarHexagonalMesh &mesh) {
   Real1d exact_grad_field("exact_grad_field", mesh.m_nedges);
 
   parallel_for(
-      mesh.m_ncells, YAKL_LAMBDA(Int icell) {
+      RangePolicy(0, mesh.m_ncells), KOKKOS_LAMBDA(Int icell) {
         Real x = mesh.m_x_cell(icell);
         Real y = mesh.m_y_cell(icell);
         input_field(icell) = sin(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
       });
 
   parallel_for(
-      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+      RangePolicy(0, mesh.m_nedges), KOKKOS_LAMBDA(Int iedge) {
         Int icell0 = mesh.m_cells_on_edge(iedge, 0);
         Int icell1 = mesh.m_cells_on_edge(iedge, 1);
 
@@ -46,9 +46,18 @@ Real error_gradient(const PlanarHexagonalMesh &mesh) {
         exact_grad_field(iedge) = nx * grad_x + ny * grad_y;
 
         exact_grad_field(iedge) -= grad_field(iedge);
-        exact_grad_field(iedge) = abs(exact_grad_field(iedge));
+        exact_grad_field(iedge) = std::abs(exact_grad_field(iedge));
       });
-  return yakl::intrinsics::maxval(exact_grad_field);
+
+  Real errf;
+  parallel_reduce(
+      RangePolicy(0, mesh.m_nedges),
+      KOKKOS_LAMBDA(Int iedge, Real & accum) {
+        accum = std::max(exact_grad_field(iedge), accum);
+      },
+      Kokkos::Max<Real>(errf));
+
+  return errf;
 }
 
 Real error_divergence(const PlanarHexagonalMesh &mesh) {
@@ -63,7 +72,7 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
   Real1d exact_div_field("exact_div_field", mesh.m_ncells);
 
   parallel_for(
-      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+      RangePolicy(0, mesh.m_nedges), KOKKOS_LAMBDA(Int iedge) {
         Real nx = cos(mesh.m_angle_edge(iedge));
         Real ny = sin(mesh.m_angle_edge(iedge));
 
@@ -77,7 +86,7 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
       });
 
   parallel_for(
-      mesh.m_ncells, YAKL_LAMBDA(Int icell) {
+      RangePolicy(0, mesh.m_ncells), KOKKOS_LAMBDA(Int icell) {
         Real accum = -0;
         for (Int j = 0; j < mesh.m_nedges_on_cell(icell); ++j) {
           Int jedge = mesh.m_edges_on_cell(icell, j);
@@ -92,10 +101,17 @@ Real error_divergence(const PlanarHexagonalMesh &mesh) {
                                  cos(2 * pi * x / Lx) * cos(2 * pi * y / Ly);
 
         exact_div_field(icell) -= div_field(icell);
-        exact_div_field(icell) = abs(exact_div_field(icell));
+        exact_div_field(icell) = std::abs(exact_div_field(icell));
       });
 
-  return yakl::intrinsics::maxval(exact_div_field);
+  Real errf;
+  parallel_reduce(
+      RangePolicy(0, mesh.m_ncells),
+      KOKKOS_LAMBDA(Int icell, Real & accum) {
+        accum = std::max(exact_div_field(icell), accum);
+      },
+      Kokkos::Max<Real>(errf));
+  return errf;
 }
 
 Real error_curl(const PlanarHexagonalMesh &mesh) {
@@ -111,7 +127,7 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
   Real1d exact_curl_field("exact_curl_field", mesh.m_nvertices);
 
   parallel_for(
-      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+      RangePolicy(0, mesh.m_nedges), KOKKOS_LAMBDA(Int iedge) {
         Real nx = cos(mesh.m_angle_edge(iedge));
         Real ny = sin(mesh.m_angle_edge(iedge));
 
@@ -125,7 +141,7 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
       });
 
   parallel_for(
-      mesh.m_nvertices, YAKL_LAMBDA(Int ivertex) {
+      RangePolicy(0, mesh.m_nvertices), KOKKOS_LAMBDA(Int ivertex) {
         Real accum = -0;
         for (Int j = 0; j < 3; ++j) {
           Int jedge = mesh.m_edges_on_vertex(ivertex, j);
@@ -140,10 +156,17 @@ Real error_curl(const PlanarHexagonalMesh &mesh) {
                                     sin(2 * pi * x / Lx) * sin(2 * pi * y / Ly);
 
         exact_curl_field(ivertex) -= curl_field(ivertex);
-        exact_curl_field(ivertex) = abs(exact_curl_field(ivertex));
+        exact_curl_field(ivertex) = std::abs(exact_curl_field(ivertex));
       });
 
-  return yakl::intrinsics::maxval(exact_curl_field);
+  Real errf;
+  parallel_reduce(
+      RangePolicy(0, mesh.m_nvertices),
+      KOKKOS_LAMBDA(Int ivertex, Real & accum) {
+        accum = std::max(exact_curl_field(ivertex), accum);
+      },
+      Kokkos::Max<Real>(errf));
+  return errf;
 }
 
 Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
@@ -159,7 +182,7 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
   Real1d exact_recon_field("exact_recon_field", mesh.m_nedges);
 
   parallel_for(
-      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+      RangePolicy(0, mesh.m_nedges), KOKKOS_LAMBDA(Int iedge) {
         Real nx = cos(mesh.m_angle_edge(iedge));
         Real ny = sin(mesh.m_angle_edge(iedge));
 
@@ -177,7 +200,7 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
       });
 
   parallel_for(
-      mesh.m_nedges, YAKL_LAMBDA(Int iedge) {
+      RangePolicy(0, mesh.m_nedges), KOKKOS_LAMBDA(Int iedge) {
         Int n = mesh.m_nedges_on_edge(iedge);
         Real accum = -0;
         for (Int j = 0; j < n; ++j) {
@@ -187,10 +210,17 @@ Real error_reconstruction(const PlanarHexagonalMesh &mesh) {
         recon_field(iedge) = accum;
 
         exact_recon_field(iedge) -= recon_field(iedge);
-        exact_recon_field(iedge) = abs(exact_recon_field(iedge));
+        exact_recon_field(iedge) = std::abs(exact_recon_field(iedge));
       });
 
-  return yakl::intrinsics::maxval(exact_recon_field);
+  Real errf;
+  parallel_reduce(
+      RangePolicy(0, mesh.m_nedges),
+      KOKKOS_LAMBDA(Int iedge, Real & accum) {
+        accum = std::max(exact_recon_field(iedge), accum);
+      },
+      Kokkos::Max<Real>(errf));
+  return errf;
 }
 
 void run(Int nlevels) {
@@ -272,8 +302,8 @@ void run(Int nlevels) {
 }
 
 int main() {
-  yakl::init();
+  Kokkos::initialize();
   Int nlevels = 5;
   run(nlevels);
-  yakl::finalize();
+  Kokkos::finalize();
 }

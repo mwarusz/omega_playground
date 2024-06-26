@@ -1,9 +1,10 @@
 set(CMAKE_CXX_COMPILER "g++" CACHE STRING "")
-set(CMAKE_C_COMPILER "gcc" CACHE STRING "")
-set(CMAKE_Fortran_COMPILER "gfortran" CACHE STRING "")
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
+set(CMAKE_CXX_FLAGS "-mprefer-vector-width=512" CACHE STRING "")
 
-set(YAKL_ARCH "OPENMP" CACHE STRING "")
-set(YAKL_OPENMP_FLAGS "-O3 -mavx512f -fopenmp" CACHE STRING "")
+set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "")
+set(Kokkos_ENABLE_OPENMP OFF CACHE BOOL "")
+set(Kokkos_ARCH_NATIVE ON CACHE BOOL "")
 
-set(OMEGA_USE_CXX_SIMD ON CACHE BOOL "")
-set(OMEGA_VECTOR_LENGTH "8" CACHE STRING "")
+set(OMEGA_USE_CALIPER ON CACHE BOOL "")
+set(caliper_DIR $ENV{HOME}/installs/caliper/share/cmake/caliper CACHE STRING "")

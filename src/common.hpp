@@ -1,54 +1,178 @@
 #pragma once
 
-#include <YAKL.h>
+#include <Kokkos_Core.hpp>
+#include <Kokkos_SIMD.hpp>
 #include <cmath>
+#include <utility>
+#include <iostream>
 
 namespace omega {
 
 using Real = double;
 using Int = int;
 
-YAKL_INLINE constexpr Real operator""_fp(long double x) { return x; }
+KOKKOS_INLINE_FUNCTION constexpr Real operator""_fp(long double x) { return x; }
 
-constexpr Int vector_length = OMEGA_VECTOR_LENGTH;
+using Vec = Kokkos::Experimental::native_simd<Real>;
+using VecTag = Kokkos::Experimental::element_aligned_tag;
+
+#ifdef OMEGA_NO_SIMD
+constexpr Int vector_length = 1; 
+#else
+constexpr Int vector_length = Vec::size(); 
+#endif
+
 
 constexpr Real pi = M_PI;
 
-using yakl::SArray;
-using yakl::c::Bounds;
-using yakl::c::parallel_for;
-using yakl::c::SimpleBounds;
+#define OMEGA_SCOPE(a, b) const auto &a = b
 
-constexpr Int block_size = 256;
-using yakl::LaunchConfig;
+using Kokkos::deep_copy;
+using Kokkos::parallel_for;
+using Kokkos::parallel_reduce;
+using Kokkos::TeamThreadRange;
+using Kokkos::ThreadVectorRange;
 
-constexpr Int nlayers_max = 64;
-using yakl::InnerHandler;
-using yakl::c::parallel_inner;
-using yakl::c::parallel_outer;
+using ExecSpace = Kokkos::DefaultExecutionSpace;
+constexpr bool exec_is_gpu = !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
 
-using Real1d = yakl::Array<Real, 1, yakl::memDevice, yakl::styleC>;
-using Real2d = yakl::Array<Real, 2, yakl::memDevice, yakl::styleC>;
-using Real3d = yakl::Array<Real, 3, yakl::memDevice, yakl::styleC>;
-using Real4d = yakl::Array<Real, 4, yakl::memDevice, yakl::styleC>;
+using MemSpace = ExecSpace::memory_space;
+using Layout = Kokkos::LayoutRight;
 
-using RealConst1d = yakl::Array<Real const, 1, yakl::memDevice, yakl::styleC>;
-using RealConst2d = yakl::Array<Real const, 2, yakl::memDevice, yakl::styleC>;
-using RealConst3d = yakl::Array<Real const, 3, yakl::memDevice, yakl::styleC>;
-using RealConst4d = yakl::Array<Real const, 4, yakl::memDevice, yakl::styleC>;
+using RangePolicy = Kokkos::RangePolicy<ExecSpace>;
+using TeamPolicy = Kokkos::TeamPolicy<ExecSpace>;
+using TeamMember = TeamPolicy::member_type;
 
-using RealHost1d = yakl::Array<Real, 1, yakl::memHost, yakl::styleC>;
-using RealHost2d = yakl::Array<Real, 2, yakl::memHost, yakl::styleC>;
-using RealHost3d = yakl::Array<Real, 3, yakl::memHost, yakl::styleC>;
-using RealHost4d = yakl::Array<Real, 4, yakl::memHost, yakl::styleC>;
+template <Int N>
+using MDRangePolicy = Kokkos::MDRangePolicy<
+    ExecSpace, Kokkos::Rank<N, Kokkos::Iterate::Right, Kokkos::Iterate::Right>>;
 
-using Int1d = yakl::Array<Int, 1, yakl::memDevice, yakl::styleC>;
-using Int2d = yakl::Array<Int, 2, yakl::memDevice, yakl::styleC>;
-using Int3d = yakl::Array<Int, 3, yakl::memDevice, yakl::styleC>;
-using Int4d = yakl::Array<Int, 4, yakl::memDevice, yakl::styleC>;
+using Real1d = Kokkos::View<Real *, Layout, MemSpace>;
+using Real2d = Kokkos::View<Real **, Layout, MemSpace>;
+using Real3d = Kokkos::View<Real ***, Layout, MemSpace>;
+using Real4d = Kokkos::View<Real ****, Layout, MemSpace>;
 
-using IntHost1d = yakl::Array<Int, 1, yakl::memHost, yakl::styleC>;
-using IntHost2d = yakl::Array<Int, 2, yakl::memHost, yakl::styleC>;
-using IntHost3d = yakl::Array<Int, 3, yakl::memHost, yakl::styleC>;
-using IntHost4d = yakl::Array<Int, 4, yakl::memHost, yakl::styleC>;
+using RealConst1d = Kokkos::View<Real const *, Layout, MemSpace>;
+using RealConst2d = Kokkos::View<Real const **, Layout, MemSpace>;
+using RealConst3d = Kokkos::View<Real const ***, Layout, MemSpace>;
+using RealConst4d = Kokkos::View<Real const ****, Layout, MemSpace>;
+
+using Int1d = Kokkos::View<Int *, Layout, MemSpace>;
+using Int2d = Kokkos::View<Int **, Layout, MemSpace>;
+using Int3d = Kokkos::View<Int ***, Layout, MemSpace>;
+using Int4d = Kokkos::View<Int ****, Layout, MemSpace>;
+
+using IntConst1d = Kokkos::View<Int const *, Layout, MemSpace>;
+using IntConst2d = Kokkos::View<Int const **, Layout, MemSpace>;
+using IntConst3d = Kokkos::View<Int const ***, Layout, MemSpace>;
+using IntConst4d = Kokkos::View<Int const ****, Layout, MemSpace>;
+
+template <class V>
+inline Kokkos::View<typename V::const_data_type, Layout, MemSpace>
+const_view(const V &view) {
+  return view;
+}
+
+template <Int N> struct DefaultTile;
+
+template <> struct DefaultTile<1> {
+  static constexpr Int value[] = {64};
+};
+
+template <> struct DefaultTile<2> {
+  static constexpr Int value[] = {1, 64};
+};
+
+template <> struct DefaultTile<3> {
+  static constexpr Int value[] = {1, 1, 64};
+};
+
+template <Int N, class F>
+inline void omega_parallel_for(const std::string &label,
+                               Int const (&upper_bounds)[N], const F &f,
+                               Int const (&tile)[N] = DefaultTile<N>::value) {
+  if constexpr (N == 1) {
+    const auto policy = RangePolicy(0, upper_bounds[0]);
+    parallel_for(label, policy, f);
+  } else {
+    const Int lower_bounds[N] = {0};
+    const auto policy = MDRangePolicy<N>(lower_bounds, upper_bounds, tile);
+    parallel_for(label, policy, f);
+  }
+}
+
+// without label
+template <Int N, class F>
+inline void omega_parallel_for(Int const (&upper_bounds)[N], const F &f,
+                               Int const (&tile)[N] = DefaultTile<N>::value) {
+  omega_parallel_for("", upper_bounds, f, tile);
+}
+
+template <Int N, class F, class R>
+inline void
+omega_parallel_reduce(const std::string &label, Int const (&upper_bounds)[N],
+                      const F &f, R &&reducer,
+                      Int const (&tile)[N] = DefaultTile<N>::value) {
+  if constexpr (N == 1) {
+    const auto policy = RangePolicy(0, upper_bounds[0]);
+    parallel_reduce(label, policy, f, std::forward<R>(reducer));
+  } else {
+    const Int lower_bounds[N] = {0};
+    const auto policy = MDRangePolicy<N>(lower_bounds, upper_bounds, tile);
+    parallel_reduce(label, policy, f, std::forward<R>(reducer));
+  }
+}
+
+// without label
+template <Int N, class F, class R>
+inline void
+omega_parallel_reduce(Int const (&upper_bounds)[N], const F &f, R &&reducer,
+                      Int const (&tile)[N] = DefaultTile<N>::value) {
+  omega_parallel_reduce("", upper_bounds, f, std::forward<R>(reducer), tile);
+}
+
+constexpr Int team_size = 1;
+constexpr Int vector_size = 64;
+
+template <class F>
+inline void omega_parallel_for_outer(const std::string &label, Int upper_bound,
+                                     const F &f) {
+  const auto policy = TeamPolicy(upper_bound, team_size, vector_size);
+  parallel_for(label, policy, f);
+}
+
+// without label
+template <class F>
+inline void omega_parallel_for_outer(Int upper_bound, const F &f) {
+  omega_parallel_for_outer("", upper_bound, f);
+}
+
+template <class F>
+inline void omega_parallel_for_inner(Int upper_bound, const F &f,
+                                     const TeamMember &team_member) {
+  const auto policy = ThreadVectorRange(team_member, upper_bound);
+  parallel_for(policy, f);
+}
+
+#ifdef OMEGA_USE_CALIPER
+#include <caliper/cali.h>
+inline void timer_start(char const * label) {
+  if constexpr (exec_is_gpu) {
+    Kokkos::fence();
+  }
+  cali_begin_region(label);
+}
+
+inline void timer_end(char const * label) {
+  if constexpr (exec_is_gpu) {
+    Kokkos::fence();
+  }
+  cali_end_region(label);
+}
+#else
+  inline void timer_start(char const * label) {}
+  inline void timer_end(char const * label) {}
+#endif
+
+
 } // namespace omega

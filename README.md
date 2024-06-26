@@ -1,11 +1,11 @@
 # Building
 
-Example of gpu build on Frontier
+To build for gpu on Frontier do:
 ```
 mkdir build
 cd build
-source ../machines/frontier-gpu.env
-cmake .. -C ../machines/frontier-gpu.cmake
+source ../machines/frontier-gpu-amdclang.env
+cmake .. -C ../machines/frontier-gpu-amdclang.cmake
 make -j8
 ```
 

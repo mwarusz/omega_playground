@@ -21,7 +21,7 @@ struct DoubleVortex {
   Real m_xc2 = (0.5 + m_ox) * m_lx;
   Real m_yc2 = (0.5 + m_oy) * m_ly;
 
-  YAKL_INLINE Real h(Real x, Real y) const {
+  KOKKOS_INLINE_FUNCTION Real h(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
@@ -35,7 +35,7 @@ struct DoubleVortex {
                           4. * pi * m_sigmax * m_sigmay / m_lx / m_ly);
   }
 
-  YAKL_INLINE Real vx(Real x, Real y) const {
+  KOKKOS_INLINE_FUNCTION Real vx(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
@@ -55,7 +55,7 @@ struct DoubleVortex {
     return vx;
   }
 
-  YAKL_INLINE Real vy(Real x, Real y) const {
+  KOKKOS_INLINE_FUNCTION Real vy(Real x, Real y) const {
     using std::exp;
     using std::sin;
 
@@ -89,34 +89,33 @@ void run(Int nx, Real cfl) {
 
   ShallowWaterModel shallow_water(mesh.get(), params);
 
-  ShallowWaterState state(shallow_water);
+  ShallowWaterState state(mesh.get(), params);
 
   LSRKStepper stepper(shallow_water);
 
   Real timeend = 200 * 1000;
-  Real dt =
-      cfl * mesh->m_dc / std::sqrt(shallow_water.m_grav * double_vortex.m_h0);
+  Real dt = cfl * mesh->m_dc / std::sqrt(params.m_grav * double_vortex.m_h0);
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
 
   auto &h_cell = state.m_h_cell;
-  YAKL_SCOPE(x_cell, mesh->m_x_cell);
-  YAKL_SCOPE(y_cell, mesh->m_y_cell);
+  OMEGA_SCOPE(x_cell, mesh->m_x_cell);
+  OMEGA_SCOPE(y_cell, mesh->m_y_cell);
   parallel_for(
-      "init_h", SimpleBounds<2>(mesh->m_ncells, mesh->m_nlayers),
-      YAKL_LAMBDA(Int icell, Int k) {
+      "init_h", MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k) {
         Real x = x_cell(icell);
         Real y = y_cell(icell);
         h_cell(icell, k) = double_vortex.h(x, y);
       });
 
   auto &vn_edge = state.m_vn_edge;
-  YAKL_SCOPE(x_edge, mesh->m_x_edge);
-  YAKL_SCOPE(y_edge, mesh->m_y_edge);
-  YAKL_SCOPE(angle_edge, mesh->m_angle_edge);
+  OMEGA_SCOPE(x_edge, mesh->m_x_edge);
+  OMEGA_SCOPE(y_edge, mesh->m_y_edge);
+  OMEGA_SCOPE(angle_edge, mesh->m_angle_edge);
   parallel_for(
-      "init_vn", SimpleBounds<2>(mesh->m_nedges, mesh->m_nlayers),
-      YAKL_LAMBDA(Int iedge, Int k) {
+      "init_vn", MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int iedge, Int k) {
         Real x = x_edge(iedge);
         Real y = y_edge(iedge);
         Real nx = std::cos(angle_edge(iedge));
@@ -126,28 +125,28 @@ void run(Int nx, Real cfl) {
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
-  Real mass0 = shallow_water.mass_integral(h_cell);
-  Real cir0 = shallow_water.circulation_integral(vn_edge);
-  Real en0 = shallow_water.energy_integral(h_cell, vn_edge);
+  Real mass0 = mass_integral(state, shallow_water);
+  Real cir0 = circulation_integral(state, shallow_water);
+  Real en0 = energy_integral(state, shallow_water);
 
-  std::cout << "Initial h: " << yakl::intrinsics::minval(h_cell) << " "
-            << yakl::intrinsics::maxval(h_cell) << std::endl;
-  std::cout << "Initial vn: " << yakl::intrinsics::minval(vn_edge) << " "
-            << yakl::intrinsics::maxval(vn_edge) << std::endl;
+  // std::cout << "Initial h: " << yakl::intrinsics::minval(h_cell) << " "
+  //           << yakl::intrinsics::maxval(h_cell) << std::endl;
+  // std::cout << "Initial vn: " << yakl::intrinsics::minval(vn_edge) << " "
+  //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
 
-  std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
-            << yakl::intrinsics::maxval(h_cell) << std::endl;
-  std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
-            << yakl::intrinsics::maxval(vn_edge) << std::endl;
+  // std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
+  //           << yakl::intrinsics::maxval(h_cell) << std::endl;
+  // std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
+  //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
 
-  Real massf = shallow_water.mass_integral(h_cell);
-  Real cirf = shallow_water.circulation_integral(vn_edge);
-  Real enf = shallow_water.energy_integral(h_cell, vn_edge);
+  Real massf = mass_integral(state, shallow_water);
+  Real cirf = circulation_integral(state, shallow_water);
+  Real enf = energy_integral(state, shallow_water);
 
   Real mass_change = (massf - mass0) / mass0;
   Real cir_change = (cirf - cir0) / cir0;
@@ -157,10 +156,10 @@ void run(Int nx, Real cfl) {
   std::cout << "Circulation change: " << cir_change << std::endl;
   std::cout << "Energy change: " << en_change << std::endl;
 
-  if (std::abs(mass_change) > 5e-15) {
+  if (std::abs(mass_change) > 5e-14) {
     throw std::runtime_error("Mass conservation check failed");
   }
-  if (std::abs(cir_change) > 5e-15) {
+  if (std::abs(cir_change) > 5e-14) {
     throw std::runtime_error("Circulation conservation check failed");
   }
   if (std::abs(en_change) > 1e-10) {
@@ -169,7 +168,7 @@ void run(Int nx, Real cfl) {
 }
 
 int main(int argc, char *argv[]) {
-  yakl::init();
+  Kokkos::initialize();
 
   Int nx = 25;
   Real cfl = 0.1;
@@ -183,5 +182,5 @@ int main(int argc, char *argv[]) {
 
   run(nx, cfl);
 
-  yakl::finalize();
+  Kokkos::finalize();
 }

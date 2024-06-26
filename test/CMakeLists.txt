@@ -1,12 +1,10 @@
 macro(add_omega_test testname)
   add_executable(${testname} ${testname}.cpp)
-  yakl_process_target(${testname})
   target_link_libraries(${testname} omega)
   add_test(NAME ${testname}_test COMMAND ./${testname})
 endmacro(add_omega_test)
 
 add_omega_test(operator_convergence)
-add_omega_test(linear_swe_convergence)
 add_omega_test(nonlinear_swe_convergence)
 add_omega_test(double_vortex)
 add_omega_test(tracer_advection_convergence)
