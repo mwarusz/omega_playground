@@ -145,6 +145,8 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
         vn_edge(iedge, k) = nx * vx + ny * vy;
       });
 
+  stepper.do_step(0, dt, state);
+
 #ifdef BENCHMARK_PROFILE_CUDA
   cudaProfilerStart();
 #endif
@@ -154,7 +156,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   Kokkos::fence();
   auto ts = std::chrono::steady_clock::now();
   for (Int step = 0; step < numberofsteps; ++step) {
-    Real t = step * dt;
+    Real t = (step + 1) * dt;
     stepper.do_step(t, dt, state);
   }
   Kokkos::fence();
