@@ -5,14 +5,17 @@ project(omega_playground CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(OMEGA_KOKKOS_REPO "https://github.com/kokkos/kokkos.git" CACHE STRING "kokkos repo")
+set(OMEGA_KOKKOS_TAG "4.3.00" CACHE STRING "kokkos tag")
+
 set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "omega vector length")
 set(OMEGA_USE_CALIPER OFF CACHE BOOL "caliper integration")
 
 include(FetchContent)
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 FetchContent_Declare(Kokkos
-  GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-  GIT_TAG 4.3.00
+  GIT_REPOSITORY ${OMEGA_KOKKOS_REPO}
+  GIT_TAG ${OMEGA_KOKKOS_TAG}
 )
 FetchContent_MakeAvailable(Kokkos)
 
