@@ -86,9 +86,9 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
     omega_parallel_for(
         "manufactured_htend", {m_mesh->m_ncells, m_mesh->m_nlayers},
         KOKKOS_LAMBDA(Int icell, Int k) {
-            Real x = x_cell(icell);
-            Real y = y_cell(icell);
-            h_tend_cell(icell, k) += manufactured_solution.h_tend(x, y, t);
+          Real x = x_cell(icell);
+          Real y = y_cell(icell);
+          h_tend_cell(icell, k) += manufactured_solution.h_tend(x, y, t);
         });
 
     OMEGA_SCOPE(x_edge, m_mesh->m_x_edge);
@@ -98,16 +98,16 @@ struct ManufacturedShallowWaterModel : ShallowWaterModel {
     omega_parallel_for(
         "manufactured_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers},
         KOKKOS_LAMBDA(Int iedge, Int k) {
-            Real x = x_edge(iedge);
-            Real y = y_edge(iedge);
+          Real x = x_edge(iedge);
+          Real y = y_edge(iedge);
 
-            Real nx = std::cos(angle_edge(iedge));
-            Real ny = std::sin(angle_edge(iedge));
+          Real nx = std::cos(angle_edge(iedge));
+          Real ny = std::sin(angle_edge(iedge));
 
-            Real vx_tend = manufactured_solution.vx_tend(x, y, t);
-            Real vy_tend = manufactured_solution.vy_tend(x, y, t);
+          Real vx_tend = manufactured_solution.vx_tend(x, y, t);
+          Real vy_tend = manufactured_solution.vy_tend(x, y, t);
 
-            vn_tend_edge(iedge, k) += nx * vx_tend + ny * vy_tend;
+          vn_tend_edge(iedge, k) += nx * vx_tend + ny * vy_tend;
         });
   }
 };

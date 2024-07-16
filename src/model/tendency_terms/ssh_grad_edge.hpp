@@ -16,8 +16,8 @@ struct SSHGradOnEdge {
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
 #ifdef OMEGA_KOKKOS_SIMD
-  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
-                                  const RealConst2d &h_cell) const {
+  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge,
+                                  Int kchunk, const RealConst2d &h_cell) const {
     const Int kstart = kchunk * vector_length;
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
@@ -34,13 +34,14 @@ struct SSHGradOnEdge {
     vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
   }
 #else
-  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
-                                  const RealConst2d &h_cell) const {
+  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge,
+                                  Int kchunk, const RealConst2d &h_cell) const {
     const Int kstart = kchunk * vector_length;
     const Int icell0 = m_cells_on_edge(iedge, 0);
     const Int icell1 = m_cells_on_edge(iedge, 1);
     const Real inv_dc_edge = 1._fp / m_dc_edge(iedge);
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       vn_tend_edge(iedge, k) -=

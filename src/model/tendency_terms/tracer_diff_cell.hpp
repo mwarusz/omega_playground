@@ -28,7 +28,7 @@ struct TracerDiffusionOnCell {
                                   const RealConst2d &h_mean_edge) const {
     const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
-    
+
     Vec accum = 0;
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
       const Int jedge = m_edges_on_cell(icell, j);
@@ -41,16 +41,15 @@ struct TracerDiffusionOnCell {
       norm_tr_jcell0.copy_from(&norm_tr_cell(l, jcell0, kstart), VecTag());
       Vec norm_tr_jcell1;
       norm_tr_jcell1.copy_from(&norm_tr_cell(l, jcell1, kstart), VecTag());
-      
+
       Vec h_mean_jedge;
       h_mean_jedge.copy_from(&h_mean_edge(jedge, kstart), VecTag());
-        
-      const Vec grad_tr_jedge =
-            (norm_tr_jcell1 - norm_tr_jcell0) *
-            inv_dc_edge;
 
-      accum += m_eddy_diff2 * inv_area_cell * m_dv_edge(jedge) * m_edge_sign_on_cell(icell, j) *
-               m_mesh_scaling_del2(jedge) * h_mean_jedge * grad_tr_jedge;
+      const Vec grad_tr_jedge = (norm_tr_jcell1 - norm_tr_jcell0) * inv_dc_edge;
+
+      accum += m_eddy_diff2 * inv_area_cell * m_dv_edge(jedge) *
+               m_edge_sign_on_cell(icell, j) * m_mesh_scaling_del2(jedge) *
+               h_mean_jedge * grad_tr_jedge;
     }
 
     Vec tr_tend_icell;
@@ -64,7 +63,7 @@ struct TracerDiffusionOnCell {
                                   const RealConst2d &h_mean_edge) const {
     const Int kstart = kchunk * vector_length;
     const Real inv_area_cell = 1._fp / m_area_cell(icell);
-    
+
     Real accum[vector_length] = {0};
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
       const Int jedge = m_edges_on_cell(icell, j);
@@ -73,17 +72,19 @@ struct TracerDiffusionOnCell {
       const Int jcell0 = m_cells_on_edge(jedge, 0);
       const Int jcell1 = m_cells_on_edge(jedge, 1);
 
+      OMEGA_SIMD_PRAGMA
       for (Int kvec = 0; kvec < vector_length; ++kvec) {
         const Int k = kstart + kvec;
         const Real grad_tr_edge =
             (norm_tr_cell(l, jcell1, k) - norm_tr_cell(l, jcell0, k)) *
             inv_dc_edge;
 
-        accum[kvec] += m_eddy_diff2 * inv_area_cell * m_dv_edge(jedge) * m_edge_sign_on_cell(icell, j) *
-                 h_mean_edge(jedge, k) * m_mesh_scaling_del2(jedge) *
-                 grad_tr_edge;
+        accum[kvec] += m_eddy_diff2 * inv_area_cell * m_dv_edge(jedge) *
+                       m_edge_sign_on_cell(icell, j) * h_mean_edge(jedge, k) *
+                       m_mesh_scaling_del2(jedge) * grad_tr_edge;
       }
     }
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       tr_tend_cell(l, icell, k) += accum[kvec];

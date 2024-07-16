@@ -162,7 +162,7 @@ void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   Kokkos::fence();
   auto te = std::chrono::steady_clock::now();
   auto time_loop_second = std::chrono::duration<double>(te - ts).count();
-  
+
   timer_end("time_integration");
 
 #ifdef BENCHMARK_PROFILE_CUDA

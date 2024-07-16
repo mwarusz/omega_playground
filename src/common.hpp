@@ -3,8 +3,8 @@
 #include <Kokkos_Core.hpp>
 #include <Kokkos_SIMD.hpp>
 #include <cmath>
-#include <utility>
 #include <iostream>
+#include <utility>
 
 namespace omega {
 
@@ -17,11 +17,12 @@ using Vec = Kokkos::Experimental::native_simd<Real>;
 using VecTag = Kokkos::Experimental::element_aligned_tag;
 
 #ifdef OMEGA_NO_SIMD
-constexpr Int vector_length = 1; 
+#define OMEGA_SIMD_PRAGMA
+constexpr Int vector_length = 1;
 #else
-constexpr Int vector_length = Vec::size(); 
+#define OMEGA_SIMD_PRAGMA _Pragma("omp simd")
+constexpr Int vector_length = Vec::size();
 #endif
-
 
 constexpr Real pi = M_PI;
 
@@ -34,7 +35,8 @@ using Kokkos::TeamThreadRange;
 using Kokkos::ThreadVectorRange;
 
 using ExecSpace = Kokkos::DefaultExecutionSpace;
-constexpr bool exec_is_gpu = !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
+constexpr bool exec_is_gpu =
+    !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
 
 using MemSpace = ExecSpace::memory_space;
 using Layout = Kokkos::LayoutRight;
@@ -156,23 +158,22 @@ inline void omega_parallel_for_inner(Int upper_bound, const F &f,
 
 #ifdef OMEGA_USE_CALIPER
 #include <caliper/cali.h>
-inline void timer_start(char const * label) {
+inline void timer_start(char const *label) {
   if constexpr (exec_is_gpu) {
     Kokkos::fence();
   }
   cali_begin_region(label);
 }
 
-inline void timer_end(char const * label) {
+inline void timer_end(char const *label) {
   if constexpr (exec_is_gpu) {
     Kokkos::fence();
   }
   cali_end_region(label);
 }
 #else
-  inline void timer_start(char const * label) {}
-  inline void timer_end(char const * label) {}
+inline void timer_start(char const *label) {}
+inline void timer_end(char const *label) {}
 #endif
-
 
 } // namespace omega

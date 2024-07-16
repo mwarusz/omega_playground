@@ -37,11 +37,13 @@ struct ThicknessAuxVars {
     const Int jcell1 = m_cells_on_edge(iedge, 1);
 
     Real mean_h_edge[vector_length];
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       mean_h_edge[kvec] = 0.5_fp * (h_cell(jcell0, k) + h_cell(jcell1, k));
     }
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       m_mean_h_edge(iedge, k) = mean_h_edge[kvec];

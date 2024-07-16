@@ -42,12 +42,13 @@ struct TracerHorzAdvOnCell {
 
       Vec h_flux_jedge;
       h_flux_jedge.copy_from(&h_flux_edge(jedge, kstart), VecTag());
-      
+
       Vec vn_jedge;
       vn_jedge.copy_from(&vn_edge(jedge, kstart), VecTag());
 
-      accum -= m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
-               h_flux_jedge * norm_tr_jedge * vn_jedge;
+      accum -= m_dv_edge(jedge) * inv_area_cell *
+               m_edge_sign_on_cell(icell, j) * h_flux_jedge * norm_tr_jedge *
+               vn_jedge;
     }
 
     Vec tr_tend_icell;
@@ -70,15 +71,18 @@ struct TracerHorzAdvOnCell {
       const Int jcell0 = m_cells_on_edge(jedge, 0);
       const Int jcell1 = m_cells_on_edge(jedge, 1);
 
+      OMEGA_SIMD_PRAGMA
       for (Int kvec = 0; kvec < vector_length; ++kvec) {
         const Int k = kstart + kvec;
         const Real norm_tr_edge =
             (norm_tr_cell(l, jcell0, k) + norm_tr_cell(l, jcell1, k)) * 0.5_fp;
 
-        accum[kvec] -= m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
-                 h_flux_edge(jedge, k) * norm_tr_edge * v_edge(jedge, k);
+        accum[kvec] -= m_dv_edge(jedge) * inv_area_cell *
+                       m_edge_sign_on_cell(icell, j) * h_flux_edge(jedge, k) *
+                       norm_tr_edge * v_edge(jedge, k);
       }
     }
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       tr_tend_cell(l, icell, k) += accum[kvec];

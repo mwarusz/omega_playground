@@ -50,15 +50,14 @@ struct VelocityHyperDiffusionOnEdge {
     div_icell0.copy_from(&div_cell(icell0, kstart), VecTag());
     Vec div_icell1;
     div_icell1.copy_from(&div_cell(icell1, kstart), VecTag());
-    
+
     Vec rvort_ivertex0;
     rvort_ivertex0.copy_from(&rvort_vertex(ivertex0, kstart), VecTag());
     Vec rvort_ivertex1;
     rvort_ivertex1.copy_from(&rvort_vertex(ivertex1, kstart), VecTag());
 
-    const Vec del2u =
-        ((div_icell1 - div_icell0) * dc_edge_inv -
-         (rvort_ivertex1 - rvort_ivertex0) * dv_edge_inv);
+    const Vec del2u = ((div_icell1 - div_icell0) * dc_edge_inv -
+                       (rvort_ivertex1 - rvort_ivertex0) * dv_edge_inv);
 
     del2u.copy_to(&m_vel_del2_edge(iedge, kstart), VecTag());
   }
@@ -72,7 +71,8 @@ struct VelocityHyperDiffusionOnEdge {
       const Int jedge = m_edges_on_vertex(ivertex, j);
       Vec vel_del2_jedge;
       vel_del2_jedge.copy_from(&m_vel_del2_edge(jedge, kstart), VecTag());
-      rvort += m_dc_edge(jedge) * inv_area_triangle * m_edge_sign_on_vertex(ivertex, j) *
+      rvort += m_dc_edge(jedge) * inv_area_triangle *
+               m_edge_sign_on_vertex(ivertex, j) *
                m_vel_del2_edge(jedge, kstart);
     }
 
@@ -89,10 +89,10 @@ struct VelocityHyperDiffusionOnEdge {
       Vec vel_del2_jedge;
       vel_del2_jedge.copy_from(&m_vel_del2_edge(jedge, kstart), VecTag());
 
-      accum += m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
-                 vel_del2_jedge;
+      accum += m_dv_edge(jedge) * inv_area_cell *
+               m_edge_sign_on_cell(icell, j) * vel_del2_jedge;
     }
-   
+
     accum.copy_to(&m_vel_del2_div_cell(icell, kstart), VecTag());
   }
 
@@ -110,24 +110,30 @@ struct VelocityHyperDiffusionOnEdge {
     const Real dv_edge_inv = 1._fp / m_dv_edge(iedge);
 
     Vec vel_del2_div_icell0;
-    vel_del2_div_icell0.copy_from(&m_vel_del2_div_cell(icell0, kstart), VecTag());
+    vel_del2_div_icell0.copy_from(&m_vel_del2_div_cell(icell0, kstart),
+                                  VecTag());
     Vec vel_del2_div_icell1;
-    vel_del2_div_icell1.copy_from(&m_vel_del2_div_cell(icell1, kstart), VecTag());
+    vel_del2_div_icell1.copy_from(&m_vel_del2_div_cell(icell1, kstart),
+                                  VecTag());
 
     Vec vel_del2_rvort_ivertex0;
-    vel_del2_rvort_ivertex0.copy_from(&m_vel_del2_rvort_vertex(ivertex0, kstart), VecTag());
+    vel_del2_rvort_ivertex0.copy_from(
+        &m_vel_del2_rvort_vertex(ivertex0, kstart), VecTag());
     Vec vel_del2_rvort_ivertex1;
-    vel_del2_rvort_ivertex1.copy_from(&m_vel_del2_rvort_vertex(ivertex1, kstart), VecTag());
+    vel_del2_rvort_ivertex1.copy_from(
+        &m_vel_del2_rvort_vertex(ivertex1, kstart), VecTag());
 
-    const Vec del2u = (vel_del2_div_icell1 - vel_del2_div_icell0) * dc_edge_inv -
-         (vel_del2_rvort_ivertex1 - vel_del2_rvort_ivertex0) * dv_edge_inv;
+    const Vec del2u =
+        (vel_del2_div_icell1 - vel_del2_div_icell0) * dc_edge_inv -
+        (vel_del2_rvort_ivertex1 - vel_del2_rvort_ivertex0) * dv_edge_inv;
 
     Vec edge_mask_iedge;
     edge_mask_iedge.copy_from(&m_edge_mask(iedge, kstart), VecTag());
-    
+
     Vec vn_tend_iedge;
     vn_tend_iedge.copy_from(&vn_tend_edge(iedge, kstart), VecTag());
-    vn_tend_iedge -= edge_mask_iedge * m_visc_del4 * m_mesh_scaling_del4(iedge) * del2u;
+    vn_tend_iedge -=
+        edge_mask_iedge * m_visc_del4 * m_mesh_scaling_del4(iedge) * del2u;
     vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
   }
 #else
@@ -145,11 +151,13 @@ struct VelocityHyperDiffusionOnEdge {
     const Real dv_edge_inv =
         1._fp / std::max(m_dv_edge(iedge), 0.25_fp * m_dc_edge(iedge)); // huh
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       const Real del2u =
           ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
-           (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) * dv_edge_inv);
+           (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
+               dv_edge_inv);
 
       m_vel_del2_edge(iedge, k) = del2u;
     }
@@ -162,13 +170,16 @@ struct VelocityHyperDiffusionOnEdge {
     Real rvort[vector_length] = {0};
     for (Int j = 0; j < 3; ++j) {
       const Int jedge = m_edges_on_vertex(ivertex, j);
+      OMEGA_SIMD_PRAGMA
       for (Int kvec = 0; kvec < vector_length; ++kvec) {
         const Int k = kstart + kvec;
-        rvort[kvec] += m_dc_edge(jedge) * inv_area_triangle * m_edge_sign_on_vertex(ivertex, j) *
-                 m_vel_del2_edge(jedge, k);
+        rvort[kvec] += m_dc_edge(jedge) * inv_area_triangle *
+                       m_edge_sign_on_vertex(ivertex, j) *
+                       m_vel_del2_edge(jedge, k);
       }
     }
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       m_vel_del2_rvort_vertex(ivertex, k) = rvort[kvec];
@@ -182,13 +193,16 @@ struct VelocityHyperDiffusionOnEdge {
     Real accum[vector_length] = {0};
     for (Int j = 0; j < m_nedges_on_cell(icell); ++j) {
       const Int jedge = m_edges_on_cell(icell, j);
+      OMEGA_SIMD_PRAGMA
       for (Int kvec = 0; kvec < vector_length; ++kvec) {
         const Int k = kstart + kvec;
-        accum[kvec] += m_dv_edge(jedge) * inv_area_cell * m_edge_sign_on_cell(icell, j) *
-                 m_vel_del2_edge(jedge, k);
+        accum[kvec] += m_dv_edge(jedge) * inv_area_cell *
+                       m_edge_sign_on_cell(icell, j) *
+                       m_vel_del2_edge(jedge, k);
       }
     }
-    
+
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       m_vel_del2_div_cell(icell, k) = accum[kvec];
@@ -207,6 +221,7 @@ struct VelocityHyperDiffusionOnEdge {
     const Real dc_edge_inv = 1._fp / m_dc_edge(iedge);
     const Real dv_edge_inv = 1._fp / m_dv_edge(iedge);
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       const Real del2u =

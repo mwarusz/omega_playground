@@ -38,16 +38,17 @@ struct VorticityAuxVars {
 
       Vec vn_edge_tmp;
       vn_edge_tmp.copy_from(&vn_edge(jedge, kstart), VecTag());
-      
+
       Vec h_cell_tmp;
       h_cell_tmp.copy_from(&h_cell(jcell, kstart), VecTag());
 
-      rvort_vertex += m_dc_edge(jedge) * inv_area_triangle * m_edge_sign_on_vertex(ivertex, j) *
-                      vn_edge_tmp;
-      thick_vertex += m_kiteareas_on_vertex(ivertex, j) * inv_area_triangle * h_cell_tmp;
+      rvort_vertex += m_dc_edge(jedge) * inv_area_triangle *
+                      m_edge_sign_on_vertex(ivertex, j) * vn_edge_tmp;
+      thick_vertex +=
+          m_kiteareas_on_vertex(ivertex, j) * inv_area_triangle * h_cell_tmp;
     }
     Vec inv_thick_vertex = 1._fp / thick_vertex;
-    
+
     rvort_vertex.copy_to(&m_rvort_vertex(ivertex, kstart), VecTag());
     rvort_vertex *= inv_thick_vertex;
     rvort_vertex.copy_to(&m_norm_rvort_vertex(ivertex, kstart), VecTag());
@@ -68,13 +69,13 @@ struct VorticityAuxVars {
     norm_rvort1.copy_from(&m_norm_rvort_vertex(jvertex1, kstart), VecTag());
 
     norm_rvort0 = 0.5_fp * (norm_rvort0 + norm_rvort1);
-    
+
     Vec norm_pvort0;
     Vec norm_pvort1;
-    
+
     norm_pvort0.copy_from(&m_norm_pvort_vertex(jvertex0, kstart), VecTag());
     norm_pvort1.copy_from(&m_norm_pvort_vertex(jvertex1, kstart), VecTag());
-    
+
     norm_pvort0 = 0.5_fp * (norm_pvort0 + norm_pvort1);
 
     norm_rvort0.copy_to(&m_norm_rvort_edge(iedge, kstart), VecTag());
@@ -93,14 +94,18 @@ struct VorticityAuxVars {
     for (Int j = 0; j < 3; ++j) {
       const Int jedge = m_edges_on_vertex(ivertex, j);
       const Int jcell = m_cells_on_vertex(ivertex, j);
+      OMEGA_SIMD_PRAGMA
       for (Int kvec = 0; kvec < vector_length; ++kvec) {
         const Int k = kstart + kvec;
-        rvort_vertex[kvec] += m_dc_edge(jedge) * inv_area_triangle * m_edge_sign_on_vertex(ivertex, j) *
-                        vn_edge(jedge, k);
-        thick_vertex[kvec] += m_kiteareas_on_vertex(ivertex, j) * inv_area_triangle * h_cell(jcell, k);
+        rvort_vertex[kvec] += m_dc_edge(jedge) * inv_area_triangle *
+                              m_edge_sign_on_vertex(ivertex, j) *
+                              vn_edge(jedge, k);
+        thick_vertex[kvec] += m_kiteareas_on_vertex(ivertex, j) *
+                              inv_area_triangle * h_cell(jcell, k);
       }
     }
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Real inv_thick_vertex = 1._fp / thick_vertex[kvec];
       const Int k = kstart + kvec;
@@ -115,6 +120,7 @@ struct VorticityAuxVars {
     const Int jvertex0 = m_vertices_on_edge(iedge, 0);
     const Int jvertex1 = m_vertices_on_edge(iedge, 1);
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       m_norm_rvort_edge(iedge, k) = 0.5_fp * (m_norm_rvort_vertex(jvertex0, k) +

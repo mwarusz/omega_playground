@@ -16,11 +16,10 @@ struct PotentialVortFluxOnEdge {
   void enable(ShallowWaterAuxiliaryState &aux_state) { m_enabled = true; }
 
 #ifdef OMEGA_KOKKOS_SIMD
-  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
-                                  const RealConst2d &norm_rvort_edge,
-                                  const RealConst2d &norm_f_edge,
-                                  const RealConst2d &h_flux_edge,
-                                  const RealConst2d &vn_edge) const {
+  KOKKOS_FUNCTION void
+  operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
+             const RealConst2d &norm_rvort_edge, const RealConst2d &norm_f_edge,
+             const RealConst2d &h_flux_edge, const RealConst2d &vn_edge) const {
     const Int kstart = kchunk * vector_length;
 
     Vec qt = 0;
@@ -36,7 +35,7 @@ struct PotentialVortFluxOnEdge {
       Vec norm_f_jedge;
       norm_rvort_jedge.copy_from(&norm_rvort_edge(jedge, kstart), VecTag());
       norm_f_jedge.copy_from(&norm_f_edge(jedge, kstart), VecTag());
-      
+
       Vec vn_jedge;
       vn_jedge.copy_from(&vn_edge(jedge, kstart), VecTag());
       Vec h_flux_jedge;
@@ -45,8 +44,7 @@ struct PotentialVortFluxOnEdge {
       const Vec norm_vort = 0.5_fp * (norm_rvort_iedge + norm_f_iedge +
                                       norm_rvort_jedge + norm_f_jedge);
 
-      qt += m_weights_on_edge(iedge, j) * h_flux_jedge *
-              vn_jedge * norm_vort;
+      qt += m_weights_on_edge(iedge, j) * h_flux_jedge * vn_jedge * norm_vort;
     }
 
     Vec vn_tend_iedge;
@@ -55,17 +53,17 @@ struct PotentialVortFluxOnEdge {
     vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
   }
 #else
-  KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
-                                  const RealConst2d &norm_rvort_edge,
-                                  const RealConst2d &norm_f_edge,
-                                  const RealConst2d &h_flux_edge,
-                                  const RealConst2d &vn_edge) const {
+  KOKKOS_FUNCTION void
+  operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
+             const RealConst2d &norm_rvort_edge, const RealConst2d &norm_f_edge,
+             const RealConst2d &h_flux_edge, const RealConst2d &vn_edge) const {
     const Int kstart = kchunk * vector_length;
 
     Real qt[vector_length] = {0};
     for (Int j = 0; j < m_nedges_on_edge(iedge); ++j) {
       const Int jedge = m_edges_on_edge(iedge, j);
 
+      OMEGA_SIMD_PRAGMA
       for (Int kvec = 0; kvec < vector_length; ++kvec) {
         const Int k = kstart + kvec;
         const Real norm_vort =
@@ -74,10 +72,11 @@ struct PotentialVortFluxOnEdge {
             0.5_fp;
 
         qt[kvec] += m_weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
-              vn_edge(jedge, k) * norm_vort;
+                    vn_edge(jedge, k) * norm_vort;
       }
     }
 
+    OMEGA_SIMD_PRAGMA
     for (Int kvec = 0; kvec < vector_length; ++kvec) {
       const Int k = kstart + kvec;
       vn_tend_edge(iedge, k) += qt[kvec];
