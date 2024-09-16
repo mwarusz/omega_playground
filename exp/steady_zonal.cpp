@@ -6,7 +6,7 @@
 using namespace omega;
 
 constexpr Real shrink_factor = 1;
-constexpr Real grav = 9.8016;
+constexpr Real grav = 9.80665;
 constexpr Real earth_radius = 6.37122e6 / shrink_factor;
 constexpr Real day = 24 * 60 * 60 / shrink_factor;
 constexpr Real omg = 7.292e-5 * shrink_factor;
@@ -44,13 +44,13 @@ Real run(Int l) {
 
   std::string mesh_file;
   if (l == 0) {
-    mesh_file = "../meshes/mesh_cvt_5.nc";
+    mesh_file = "/Users/mwarusz/mpas_meshes/icos-nw/icos-cvt-hi/icos960.nc";
   } else {
-    mesh_file = "../meshes/mesh_cvt_6.nc";
+    mesh_file = "/Users/mwarusz/mpas_meshes/icos-nw/icos-cvt-hi/icos480.nc";
   }
 
-  auto mesh = std::make_unique<FileMesh>(mesh_file);
-  mesh->rescale_radius(earth_radius);
+  auto mesh = std::make_unique<FileMesh>(mesh_file, 64);
+  //mesh->rescale_radius(earth_radius);
 
   ShallowWaterParams params;
   params.m_grav = grav;
@@ -58,7 +58,7 @@ Real run(Int l) {
 
   ShallowWaterState state(mesh.get(), params);
 
-  LSRKStepper stepper(shallow_water);
+  RK4Stepper stepper(shallow_water);
 
   Real min_dc_edge;
 
@@ -76,6 +76,8 @@ Real run(Int l) {
             (steady_zonal.m_u0 + std::sqrt(grav * steady_zonal.m_h0));
   Int numberofsteps = std::ceil(timeend / dt);
   dt = timeend / numberofsteps;
+
+  std::cout << "timestep: " << dt << std::endl;
 
   auto &h_cell = state.m_h_cell;
   Real2d h_exact_cell("h_exact_cell", mesh->m_ncells, mesh->m_nlayers);
@@ -120,30 +122,35 @@ Real run(Int l) {
         f_edge(iedge) = steady_zonal.coriolis(lon, lat);
       });
 
+  Kokkos::Timer timer;
+  timer.reset();
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
+  std::cout << "runtime: " << timer.seconds() << std::endl;
   // std::cout << "h extrema: " << yakl::intrinsics::minval(h_cell) << " "
   //           << yakl::intrinsics::maxval(h_cell) << std::endl;
 
   OMEGA_SCOPE(area_cell, mesh->m_area_cell);
   Real errf;
-  omega_parallel_reduce(
-      "compute_error", {mesh->m_ncells, mesh->m_nlayers},
-      KOKKOS_LAMBDA(Int icell, Int k, Real & accum) {
+  Real scale;
+  parallel_reduce(
+      "compute_error", MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+      KOKKOS_LAMBDA(Int icell, Int k, Real & accum, Real & scale_accum) {
         Real err = h_exact_cell(icell, k) - h_cell(icell, k);
         accum += area_cell(icell) * err * err;
+        scale_accum += area_cell(icell) * h_exact_cell(icell, k) * h_exact_cell(icell, k);
       },
-      errf);
+      errf, scale);
 
-  return std::sqrt(errf);
+  return std::sqrt(errf / scale);
 }
 
 int main() {
   Kokkos::initialize();
 
-  Int nlevels = 2;
+  Int nlevels = 1;
 
   std::vector<Real> err(nlevels);
   for (Int l = 0; l < nlevels; ++l) {
@@ -152,7 +159,7 @@ int main() {
 
   if (nlevels > 1) {
     std::vector<Real> rate(nlevels - 1);
-    std::cout << "Cosine bell convergence" << std::endl;
+    std::cout << "Steady zonal convergence" << std::endl;
     for (Int l = 0; l < nlevels; ++l) {
       std::cout << l << " " << err[l];
       if (l > 0) {
