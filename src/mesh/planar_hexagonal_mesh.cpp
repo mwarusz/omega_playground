@@ -6,57 +6,11 @@ PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Int nlayers)
     : PlanarHexagonalMesh(nx, ny, 1. / nx, nlayers) {}
 
 PlanarHexagonalMesh::PlanarHexagonalMesh(Int nx, Int ny, Real dc, Int nlayers)
-    : m_nx(nx), m_ny(ny), m_dc(dc) {
+    : MPASMesh(nx * ny, 3 * nx * ny, 2 * nx * ny, nlayers), m_nx(nx), m_ny(ny),
+      m_dc(dc) {
 
-  m_nlayers = std::ceil(Real(nlayers) / vector_length) * vector_length;
-  m_nlayers_vec = std::ceil(Real(nlayers) / vector_length);
-  m_ncells = nx * ny;
-  m_nedges = 3 * m_ncells;
-  m_nvertices = 2 * m_ncells;
   m_period_x = nx * dc;
   m_period_y = ny * dc * sqrt(3) / 2;
-
-  // cell properties
-  m_nedges_on_cell = Int1d("nedges_on_cell", m_ncells);
-  m_cells_on_cell = Int2d("cells_on_cell", m_ncells, maxedges);
-  m_edges_on_cell = Int2d("edges_on_cell", m_ncells, maxedges);
-  m_vertices_on_cell = Int2d("vertices_on_cell", m_ncells, maxedges);
-
-  m_area_cell = Real1d("area_cell", m_ncells);
-  m_lat_cell = Real1d("lat_cell", m_ncells);
-  m_lon_cell = Real1d("lon_cell", m_ncells);
-  m_x_cell = Real1d("x_cell", m_ncells);
-  m_y_cell = Real1d("y_cell", m_ncells);
-  m_z_cell = Real1d("z_cell", m_ncells);
-  m_mesh_density = Real1d("mesh_density", m_ncells);
-
-  // edge properties
-  m_nedges_on_edge = Int1d("nedges_on_edge", m_nedges);
-  m_cells_on_edge = Int2d("cells_on_edge", m_nedges, 2);
-  m_vertices_on_edge = Int2d("vertices_on_edge", m_nedges, 2);
-  m_edges_on_edge = Int2d("edges_on_edge", m_nedges, 2 * maxedges);
-
-  m_dc_edge = Real1d("dc_edge", m_nedges);
-  m_dv_edge = Real1d("dv_edge", m_nedges);
-  m_angle_edge = Real1d("angle_edge", m_nedges);
-  m_lat_edge = Real1d("lat_edge", m_nedges);
-  m_lon_edge = Real1d("lon_edge", m_nedges);
-  m_x_edge = Real1d("x_edge", m_nedges);
-  m_y_edge = Real1d("y_edge", m_nedges);
-  m_z_edge = Real1d("z_edge", m_nedges);
-  m_weights_on_edge = Real2d("weights_on_edge", m_nedges, 2 * maxedges);
-
-  // vertex properties
-  m_edges_on_vertex = Int2d("edges_on_vertex", m_nvertices, 3);
-  m_cells_on_vertex = Int2d("cells_on_vertex", m_nvertices, 3);
-
-  m_area_triangle = Real1d("area_triangle", m_nvertices);
-  m_lat_vertex = Real1d("lat_vertex", m_nvertices);
-  m_lon_vertex = Real1d("lon_vertex", m_nvertices);
-  m_x_vertex = Real1d("x_vertex", m_nvertices);
-  m_y_vertex = Real1d("y_vertex", m_nvertices);
-  m_z_vertex = Real1d("z_vertex", m_nvertices);
-  m_kiteareas_on_vertex = Real2d("kiteareas_on_vertex", m_nvertices, 3);
 
   compute_mesh_arrays();
 }

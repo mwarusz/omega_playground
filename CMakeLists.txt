@@ -20,6 +20,7 @@ FetchContent_Declare(Kokkos
 FetchContent_MakeAvailable(Kokkos)
 
 add_library(omega)
+
 target_link_libraries(omega PUBLIC Kokkos::kokkos)
 if (${OMEGA_USE_CALIPER})
   find_package(caliper REQUIRED)
@@ -36,6 +37,11 @@ if (${OMEGA_NO_INNER_IF})
   target_compile_definitions(omega PUBLIC OMEGA_NO_INNER_IF=1)
 endif()
 
+find_package(netCDFCxx)
+if (${netCDFCxx_FOUND})
+  find_package(HDF5 REQUIRED COMPONENTS C HL)
+  target_link_libraries(omega PUBLIC HDF5::HDF5 netCDF::netcdf-cxx4)
+endif()
 
 target_include_directories(omega PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -44,6 +50,9 @@ target_include_directories(omega PUBLIC
 add_subdirectory(src)
 
 add_subdirectory(benchmark)
+if (${netCDFCxx_FOUND})
+  add_subdirectory(exp)
+endif()
 
 enable_testing()
 add_subdirectory(test)

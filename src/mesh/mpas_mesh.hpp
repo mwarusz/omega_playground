@@ -67,6 +67,7 @@ struct MPASMesh {
   Real2d m_kiteareas_on_vertex;
   Real2d m_edge_sign_on_vertex;
 
+  MPASMesh(Int ncells, Int nedges, Int nvertices, Int nlayers);
   void finalize_mesh();
 };
 
