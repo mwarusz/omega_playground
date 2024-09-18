@@ -39,15 +39,10 @@ struct SteadyZonal {
   }
 };
 
-Real run(Int l) {
+Real run() {
   SteadyZonal steady_zonal;
 
-  std::string mesh_file;
-  if (l == 0) {
-    mesh_file = "/Users/mwarusz/mpas_meshes/icos-nw/icos-cvt-hi/icos960.nc";
-  } else {
-    mesh_file = "/Users/mwarusz/mpas_meshes/icos-nw/icos-cvt-hi/icos480.nc";
-  }
+  std::string mesh_file = "perf_mesh.nc";
 
   auto mesh = std::make_unique<FileMesh>(mesh_file, 64);
   //mesh->rescale_radius(earth_radius);
@@ -150,25 +145,8 @@ Real run(Int l) {
 int main() {
   Kokkos::initialize();
 
-  Int nlevels = 1;
-
-  std::vector<Real> err(nlevels);
-  for (Int l = 0; l < nlevels; ++l) {
-    err[l] = run(l);
-  }
-
-  if (nlevels > 1) {
-    std::vector<Real> rate(nlevels - 1);
-    std::cout << "Steady zonal convergence" << std::endl;
-    for (Int l = 0; l < nlevels; ++l) {
-      std::cout << l << " " << err[l];
-      if (l > 0) {
-        rate[l - 1] = std::log2(err[l - 1] / err[l]);
-        std::cout << " " << rate[l - 1];
-      }
-      std::cout << std::endl;
-    }
-  }
+  Real errf = run();
+  std::cout << "errf: " << errf << std::endl;
 
   Kokkos::finalize();
 }
