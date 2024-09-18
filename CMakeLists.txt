@@ -37,10 +37,17 @@ if (${OMEGA_NO_INNER_IF})
   target_compile_definitions(omega PUBLIC OMEGA_NO_INNER_IF=1)
 endif()
 
+
+set(NETCDF_WORKAROUND OFF CACHE BOOL "netcdf/hdf5 workaround")
+
 find_package(netCDFCxx)
 if (${netCDFCxx_FOUND})
-  find_package(HDF5 REQUIRED COMPONENTS C HL)
-  target_link_libraries(omega PUBLIC HDF5::HDF5 netCDF::netcdf-cxx4)
+  target_link_libraries(omega PUBLIC netCDF::netcdf-cxx4)
+  # for some reason I need to explictly look for hdf5 on my mac laptop
+  if (${NETCDF_WORKAROUND})
+    find_package(HDF5 REQUIRED COMPONENTS C HL)
+    target_link_libraries(omega PUBLIC HDF5::HDF5)
+  endif()
 endif()
 
 target_include_directories(omega PUBLIC

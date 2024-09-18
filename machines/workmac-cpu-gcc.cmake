@@ -7,3 +7,6 @@ set(Kokkos_ARCH_NATIVE ON CACHE BOOL "")
 
 set(OMEGA_USE_CALIPER ON CACHE BOOL "")
 set(caliper_DIR "/Users/mwarusz/installs/caliper/share/cmake/caliper" CACHE STRING "")
+
+set(NETCDF_WORKAROUND ON CACHE BOOL "")
+set(netCDFCxx_DIR $ENV{HOME}/installs/netcdf-cxx/lib/cmake/netCDF/ CACHE STRING "")
