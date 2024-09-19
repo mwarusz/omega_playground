@@ -119,10 +119,12 @@ Real run() {
 
   Kokkos::Timer timer;
   timer.reset();
+  timer_start("time_loop");
   for (Int step = 0; step < numberofsteps; ++step) {
     Real t = step * dt;
     stepper.do_step(t, dt, state);
   }
+  timer_stop("time_loop");
   std::cout << "runtime: " << timer.seconds() << std::endl;
   // std::cout << "h extrema: " << yakl::intrinsics::minval(h_cell) << " "
   //           << yakl::intrinsics::maxval(h_cell) << std::endl;

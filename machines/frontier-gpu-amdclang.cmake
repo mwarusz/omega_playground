@@ -10,3 +10,5 @@ set(Kokkos_ARCH_GFX90A ON CACHE BOOL "")
 
 set(OMEGA_USE_CALIPER ON CACHE BOOL "")
 set(caliper_DIR $ENV{HOME}/installs/caliper/share/cmake/caliper CACHE STRING "")
+
+set(netCDFCxx_DIR $ENV{HOME}/installs/netcdf-cxx/lib64/cmake/netCDF/ CACHE STRING "") 
