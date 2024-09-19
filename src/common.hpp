@@ -29,16 +29,19 @@ constexpr Real pi = M_PI;
 #define OMEGA_SCOPE(a, b) const auto &a = b
 
 using Kokkos::deep_copy;
+using Kokkos::create_mirror_view;
 using Kokkos::parallel_for;
 using Kokkos::parallel_reduce;
 using Kokkos::TeamThreadRange;
 using Kokkos::ThreadVectorRange;
 
 using ExecSpace = Kokkos::DefaultExecutionSpace;
+using HostExecSpace = Kokkos::DefaultHostExecutionSpace;
 constexpr bool exec_is_gpu =
     !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
 
 using MemSpace = ExecSpace::memory_space;
+using HostMemSpace = HostExecSpace::memory_space;
 using Layout = Kokkos::LayoutRight;
 
 using RangePolicy = Kokkos::RangePolicy<ExecSpace>;

@@ -2,6 +2,15 @@
 
 namespace omega {
 
+template<class DeviceView>
+static void get_from_file(const std::string &name,
+                  const netCDF::NcFile &mesh_file,
+                  DeviceView view) {
+  auto host_view = create_mirror_view(HostMemSpace(), view);
+  mesh_file.getVar(name).getVar(host_view.data());
+  deep_copy(view, host_view);
+}
+
 FileMesh::FileMesh(const std::string &filename, Int nlayers)
     : FileMesh(netCDF::NcFile(filename, netCDF::NcFile::read), nlayers) {}
 
@@ -10,44 +19,44 @@ FileMesh::FileMesh(const netCDF::NcFile &mesh_file, Int nlayers)
                mesh_file.getDim("nEdges").getSize(),
                mesh_file.getDim("nVertices").getSize(), nlayers) {
 
-  mesh_file.getVar("nEdgesOnCell").getVar(m_nedges_on_cell.data());
-  mesh_file.getVar("edgesOnCell").getVar(m_edges_on_cell.data());
-  mesh_file.getVar("cellsOnCell").getVar(m_cells_on_cell.data());
-  mesh_file.getVar("verticesOnCell").getVar(m_vertices_on_cell.data());
+  get_from_file("nEdgesOnCell", mesh_file, m_nedges_on_cell);
+  get_from_file("edgesOnCell", mesh_file, m_edges_on_cell);
+  get_from_file("cellsOnCell", mesh_file, m_cells_on_cell);
+  get_from_file("verticesOnCell", mesh_file, m_vertices_on_cell);
+  
+  get_from_file("areaCell", mesh_file, m_area_cell);
+  get_from_file("latCell", mesh_file, m_lat_cell);
+  get_from_file("lonCell", mesh_file, m_lon_cell);
+  get_from_file("xCell", mesh_file, m_x_cell);
+  get_from_file("yCell", mesh_file, m_y_cell);
+  get_from_file("zCell", mesh_file, m_z_cell);
+  get_from_file("meshDensity", mesh_file, m_mesh_density);
+  
+  get_from_file("nEdgesOnEdge", mesh_file, m_nedges_on_edge);
+  get_from_file("edgesOnEdge", mesh_file, m_edges_on_edge);
+  get_from_file("cellsOnEdge", mesh_file, m_cells_on_edge);
+  get_from_file("verticesOnEdge", mesh_file, m_vertices_on_edge);
+  
+  get_from_file("dcEdge", mesh_file, m_dc_edge);
+  get_from_file("dvEdge", mesh_file, m_dv_edge);
+  get_from_file("angleEdge", mesh_file, m_angle_edge);
+  get_from_file("latEdge", mesh_file, m_lat_edge);
+  get_from_file("lonEdge", mesh_file, m_lon_edge);
+  get_from_file("xEdge", mesh_file, m_x_edge);
+  get_from_file("yEdge", mesh_file, m_y_edge);
+  get_from_file("zEdge", mesh_file, m_z_edge);
+  get_from_file("weightsOnEdge", mesh_file, m_weights_on_edge);
 
-  mesh_file.getVar("areaCell").getVar(m_area_cell.data());
-  mesh_file.getVar("latCell").getVar(m_lat_cell.data());
-  mesh_file.getVar("lonCell").getVar(m_lon_cell.data());
-  mesh_file.getVar("xCell").getVar(m_x_cell.data());
-  mesh_file.getVar("yCell").getVar(m_y_cell.data());
-  mesh_file.getVar("zCell").getVar(m_z_cell.data());
-  mesh_file.getVar("meshDensity").getVar(m_mesh_density.data());
+  get_from_file("edgesOnVertex", mesh_file, m_edges_on_vertex);
+  get_from_file("cellsOnVertex", mesh_file, m_cells_on_vertex);
 
-  mesh_file.getVar("nEdgesOnEdge").getVar(m_nedges_on_edge.data());
-  mesh_file.getVar("edgesOnEdge").getVar(m_edges_on_edge.data());
-  mesh_file.getVar("cellsOnEdge").getVar(m_cells_on_edge.data());
-  mesh_file.getVar("verticesOnEdge").getVar(m_vertices_on_edge.data());
-
-  mesh_file.getVar("dcEdge").getVar(m_dc_edge.data());
-  mesh_file.getVar("dvEdge").getVar(m_dv_edge.data());
-  mesh_file.getVar("angleEdge").getVar(m_angle_edge.data());
-  mesh_file.getVar("latEdge").getVar(m_lat_edge.data());
-  mesh_file.getVar("lonEdge").getVar(m_lon_edge.data());
-  mesh_file.getVar("xEdge").getVar(m_x_edge.data());
-  mesh_file.getVar("yEdge").getVar(m_y_edge.data());
-  mesh_file.getVar("zEdge").getVar(m_z_edge.data());
-  mesh_file.getVar("weightsOnEdge").getVar(m_weights_on_edge.data());
-
-  mesh_file.getVar("edgesOnVertex").getVar(m_edges_on_vertex.data());
-  mesh_file.getVar("cellsOnVertex").getVar(m_cells_on_vertex.data());
-
-  mesh_file.getVar("areaTriangle").getVar(m_area_triangle.data());
-  mesh_file.getVar("latVertex").getVar(m_lat_vertex.data());
-  mesh_file.getVar("lonVertex").getVar(m_lon_vertex.data());
-  mesh_file.getVar("xVertex").getVar(m_x_vertex.data());
-  mesh_file.getVar("yVertex").getVar(m_y_vertex.data());
-  mesh_file.getVar("zVertex").getVar(m_z_vertex.data());
-  mesh_file.getVar("kiteAreasOnVertex").getVar(m_kiteareas_on_vertex.data());
+  get_from_file("areaTriangle", mesh_file, m_area_triangle);
+  get_from_file("latVertex", mesh_file, m_lat_vertex);
+  get_from_file("lonVertex", mesh_file, m_lon_vertex);
+  get_from_file("xVertex", mesh_file, m_x_vertex);
+  get_from_file("yVertex", mesh_file, m_y_vertex);
+  get_from_file("zVertex", mesh_file, m_z_vertex);
+  get_from_file("kiteAreasOnVertex", mesh_file, m_kiteareas_on_vertex);
 
   convert_fortran_indices_to_cxx();
   finalize_mesh();
