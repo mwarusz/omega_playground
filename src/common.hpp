@@ -168,7 +168,7 @@ inline void timer_start(char const *label) {
   cali_begin_region(label);
 }
 
-inline void timer_end(char const *label) {
+inline void timer_stop(char const *label) {
   if constexpr (exec_is_gpu) {
     Kokkos::fence();
   }
@@ -176,7 +176,7 @@ inline void timer_end(char const *label) {
 }
 #else
 inline void timer_start(char const *label) {}
-inline void timer_end(char const *label) {}
+inline void timer_stop(char const *label) {}
 #endif
 
 } // namespace omega

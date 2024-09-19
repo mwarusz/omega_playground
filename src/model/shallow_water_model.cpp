@@ -317,27 +317,27 @@ void ShallowWaterModel::compute_tendency(const ShallowWaterState &tend,
   timer_start("compute_aux");
   m_aux_state.compute(state.m_h_cell, state.m_vn_edge, state.m_tr_cell,
                       m_f_vertex, m_mesh);
-  timer_end("compute_aux");
+  timer_stop("compute_aux");
 
   if (!m_params.m_disable_h_tendency) {
     timer_start("thick_tend");
     compute_h_tendency(tend.m_h_cell, state.m_h_cell, state.m_vn_edge,
                        add_mode);
-    timer_end("thick_tend");
+    timer_stop("thick_tend");
   }
 
   if (!m_params.m_disable_vn_tendency) {
     timer_start("vel_tend");
     compute_vn_tendency(tend.m_vn_edge, state.m_h_cell, state.m_vn_edge,
                         add_mode);
-    timer_end("vel_tend");
+    timer_stop("vel_tend");
   }
 
   if (m_params.m_ntracers > 0) {
     timer_start("tr_tend");
     compute_tr_tendency(tend.m_tr_cell, state.m_tr_cell, state.m_vn_edge,
                         add_mode);
-    timer_end("tr_tend");
+    timer_stop("tr_tend");
   }
 
   additional_tendency(tend.m_h_cell, tend.m_vn_edge, state.m_h_cell,
