@@ -129,6 +129,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
+  timer_start("vel_tend_only");
 #ifdef OMEGA_NO_INNER_IF
   if (add_mode == AddMode::replace) {
     omega_parallel_for(
@@ -252,6 +253,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
       });
 #endif
 #endif
+  timer_stop("vel_tend_only");
 }
 
 void ShallowWaterModel::compute_tr_tendency(Real3d tr_tend_cell,
