@@ -19,12 +19,12 @@ ShallowWaterModel::ShallowWaterModel(MPASMesh *mesh,
   m_pv_flux_edge.enable(m_aux_state);
   m_ke_grad_edge.enable(m_aux_state);
   m_ssh_grad_edge.enable(m_aux_state);
-  if (params.m_visc_del2 > 0) {
+  //if (params.m_visc_del2 > 0) {
     m_vel_diff_edge.enable(m_aux_state);
-  }
-  if (params.m_visc_del4 > 0) {
+  //}
+  //if (params.m_visc_del4 > 0) {
     m_vel_hyperdiff_edge.enable(m_aux_state);
-  }
+  //}
 
   m_tracer_hadv_cell.enable(m_aux_state);
   if (params.m_eddy_diff2 > 0) {
