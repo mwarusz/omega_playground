@@ -33,6 +33,22 @@ struct KineticEnergyGradOnEdge {
     vn_tend_edge_tmp -= (ke_cell1 - ke_cell0) * inv_dc_edge;
     vn_tend_edge_tmp.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
   }
+
+  KOKKOS_FUNCTION void operator()(Vec &vn_tend_edge, Int iedge,
+                                  Int kchunk,
+                                  const RealConst2d &ke_cell) const {
+    const Int kstart = kchunk * vector_length;
+    const Int icell0 = m_cells_on_edge(iedge, 0);
+    const Int icell1 = m_cells_on_edge(iedge, 1);
+    const Real inv_dc_edge = 1._fp / m_dc_edge(iedge);
+
+    Vec ke_cell0;
+    ke_cell0.copy_from(&ke_cell(icell0, kstart), VecTag());
+    Vec ke_cell1;
+    ke_cell1.copy_from(&ke_cell(icell1, kstart), VecTag());
+
+    vn_tend_edge -= (ke_cell1 - ke_cell0) * inv_dc_edge;
+  }
 #else
   KOKKOS_FUNCTION void operator()(const Real2d &vn_tend_edge, Int iedge,
                                   Int kchunk,

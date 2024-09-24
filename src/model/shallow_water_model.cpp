@@ -186,6 +186,41 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   omega_parallel_for(
       "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
       KOKKOS_LAMBDA(Int iedge, Int kchunk) {
+#ifdef OMEGA_KSIMD_ACCUM
+        Vec vn_tend_iedge;
+        const Int kstart = kchunk * vector_length;
+
+        if (add_mode == AddMode::replace) {
+          vn_tend_iedge = 0._fp;
+        } else {
+          vn_tend_iedge.copy_from(&vn_tend_edge(iedge, kstart), VecTag());
+        }
+
+        if (pv_flux_edge.m_enabled) {
+          pv_flux_edge(vn_tend_iedge, iedge, kchunk, norm_rvort_edge,
+                       norm_pvort_edge, flux_h_edge, vn_edge);
+        }
+
+        if (ke_grad_edge.m_enabled) {
+          ke_grad_edge(vn_tend_iedge, iedge, kchunk, ke_cell);
+        }
+
+        if (ssh_grad_edge.m_enabled) {
+          ssh_grad_edge(vn_tend_iedge, iedge, kchunk, h_cell);
+        }
+
+        if (vel_diff_edge.m_enabled) {
+          vel_diff_edge(vn_tend_iedge, iedge, kchunk, vel_div_cell,
+                        rvort_vertex);
+        }
+
+        if (vel_hyperdiff_edge.m_enabled) {
+          vel_hyperdiff_edge(vn_tend_iedge, iedge, kchunk);
+        }
+        
+        vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
+      });
+#else
         if (add_mode == AddMode::replace) {
           for (Int kvec = 0; kvec < vector_length; ++kvec) {
             const Int k = kchunk * vector_length + kvec;
@@ -215,6 +250,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           vel_hyperdiff_edge(vn_tend_edge, iedge, kchunk);
         }
       });
+#endif
 #endif
 }
 

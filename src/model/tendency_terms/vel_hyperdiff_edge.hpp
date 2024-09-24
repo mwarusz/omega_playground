@@ -136,6 +136,45 @@ struct VelocityHyperDiffusionOnEdge {
         edge_mask_iedge * m_visc_del4 * m_mesh_scaling_del4(iedge) * del2u;
     vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
   }
+
+
+  KOKKOS_FUNCTION void operator()(Vec &vn_tend_edge, Int iedge,
+                                  Int kchunk) const {
+    const Int kstart = kchunk * vector_length;
+
+    const Int icell0 = m_cells_on_edge(iedge, 0);
+    const Int icell1 = m_cells_on_edge(iedge, 1);
+
+    const Int ivertex0 = m_vertices_on_edge(iedge, 0);
+    const Int ivertex1 = m_vertices_on_edge(iedge, 1);
+
+    const Real dc_edge_inv = 1._fp / m_dc_edge(iedge);
+    const Real dv_edge_inv = 1._fp / m_dv_edge(iedge);
+
+    Vec vel_del2_div_icell0;
+    vel_del2_div_icell0.copy_from(&m_vel_del2_div_cell(icell0, kstart),
+                                  VecTag());
+    Vec vel_del2_div_icell1;
+    vel_del2_div_icell1.copy_from(&m_vel_del2_div_cell(icell1, kstart),
+                                  VecTag());
+
+    Vec vel_del2_rvort_ivertex0;
+    vel_del2_rvort_ivertex0.copy_from(
+        &m_vel_del2_rvort_vertex(ivertex0, kstart), VecTag());
+    Vec vel_del2_rvort_ivertex1;
+    vel_del2_rvort_ivertex1.copy_from(
+        &m_vel_del2_rvort_vertex(ivertex1, kstart), VecTag());
+
+    const Vec del2u =
+        (vel_del2_div_icell1 - vel_del2_div_icell0) * dc_edge_inv -
+        (vel_del2_rvort_ivertex1 - vel_del2_rvort_ivertex0) * dv_edge_inv;
+
+    Vec edge_mask_iedge;
+    edge_mask_iedge.copy_from(&m_edge_mask(iedge, kstart), VecTag());
+
+    vn_tend_edge -=
+        edge_mask_iedge * m_visc_del4 * m_mesh_scaling_del4(iedge) * del2u;
+  }
 #else
   KOKKOS_FUNCTION void compute_vel_del2(Int iedge, Int kchunk,
                                         const RealConst2d &div_cell,

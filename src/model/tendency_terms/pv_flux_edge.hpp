@@ -52,6 +52,40 @@ struct PotentialVortFluxOnEdge {
     vn_tend_iedge += qt;
     vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
   }
+  
+  KOKKOS_FUNCTION void
+  operator()(Vec &vn_tend_edge, Int iedge, Int kchunk,
+             const RealConst2d &norm_rvort_edge, const RealConst2d &norm_f_edge,
+             const RealConst2d &h_flux_edge, const RealConst2d &vn_edge) const {
+    const Int kstart = kchunk * vector_length;
+
+    Vec qt = 0;
+    Vec norm_rvort_iedge;
+    Vec norm_f_iedge;
+    norm_rvort_iedge.copy_from(&norm_rvort_edge(iedge, kstart), VecTag());
+    norm_f_iedge.copy_from(&norm_f_edge(iedge, kstart), VecTag());
+
+    for (Int j = 0; j < m_nedges_on_edge(iedge); ++j) {
+      const Int jedge = m_edges_on_edge(iedge, j);
+
+      Vec norm_rvort_jedge;
+      Vec norm_f_jedge;
+      norm_rvort_jedge.copy_from(&norm_rvort_edge(jedge, kstart), VecTag());
+      norm_f_jedge.copy_from(&norm_f_edge(jedge, kstart), VecTag());
+
+      Vec vn_jedge;
+      vn_jedge.copy_from(&vn_edge(jedge, kstart), VecTag());
+      Vec h_flux_jedge;
+      h_flux_jedge.copy_from(&h_flux_edge(jedge, kstart), VecTag());
+
+      const Vec norm_vort = 0.5_fp * (norm_rvort_iedge + norm_f_iedge +
+                                      norm_rvort_jedge + norm_f_jedge);
+
+      qt += m_weights_on_edge(iedge, j) * h_flux_jedge * vn_jedge * norm_vort;
+    }
+
+    vn_tend_edge += qt;
+  }
 #else
   KOKKOS_FUNCTION void
   operator()(const Real2d &vn_tend_edge, Int iedge, Int kchunk,
