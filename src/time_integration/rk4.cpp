@@ -50,7 +50,8 @@ void RK4Stepper::do_step(Real t, Real dt,
   m_shallow_water->compute_tendency(m_tend, state, t);
 
   for (Int stage = 0; stage < nstages; ++stage) {
-
+ 
+    timer_start("rk1");
     const Real rkb_stage = m_rkb[stage];
     omega_parallel_for(
         "rk4_accumulate_h", {mesh->m_ncells, mesh->m_nlayers},
@@ -70,11 +71,13 @@ void RK4Stepper::do_step(Real t, Real dt,
                 dt * rkb_stage * tr_tend_cell(l, icell, k);
           });
     }
+    timer_stop("rk1");
 
     if (stage < nstages - 1) {
       Real stagetime = t + m_rkc[stage] * dt;
       const Real rka_stage = m_rka[stage];
 
+      timer_start("rk2");
       omega_parallel_for(
           "rk4_compute_h_provis", {mesh->m_ncells, mesh->m_nlayers},
           KOKKOS_LAMBDA(Int icell, Int k) {
@@ -97,6 +100,7 @@ void RK4Stepper::do_step(Real t, Real dt,
                   dt * rka_stage * tr_tend_cell(l, icell, k);
             });
       }
+      timer_stop("rk2");
 
       m_shallow_water->compute_tendency(m_tend, m_provis_state, stagetime);
     }
