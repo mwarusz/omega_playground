@@ -116,6 +116,35 @@ struct PotentialVortFluxOnEdge {
       vn_tend_edge(iedge, k) += qt[kvec];
     }
   }
+  
+  KOKKOS_FUNCTION void
+  operator()(Vec &vn_tend_edge, Int iedge, Int kchunk,
+             const RealConst2d &norm_rvort_edge, const RealConst2d &norm_f_edge,
+             const RealConst2d &h_flux_edge, const RealConst2d &vn_edge) const {
+    const Int kstart = kchunk * vector_length;
+
+    Real qt[vector_length] = {0};
+    for (Int j = 0; j < m_nedges_on_edge(iedge); ++j) {
+      const Int jedge = m_edges_on_edge(iedge, j);
+
+      OMEGA_SIMD_PRAGMA
+      for (Int kvec = 0; kvec < vector_length; ++kvec) {
+        const Int k = kstart + kvec;
+        const Real norm_vort =
+            (norm_rvort_edge(iedge, k) + norm_f_edge(iedge, k) +
+             norm_rvort_edge(jedge, k) + norm_f_edge(jedge, k)) *
+            0.5_fp;
+
+        qt[kvec] += m_weights_on_edge(iedge, j) * h_flux_edge(jedge, k) *
+                    vn_edge(jedge, k) * norm_vort;
+      }
+    }
+
+    OMEGA_SIMD_PRAGMA
+    for (Int kvec = 0; kvec < vector_length; ++kvec) {
+      vn_tend_edge[kvec] += qt[kvec];
+    }
+  }
 #endif
 
   PotentialVortFluxOnEdge(const MPASMesh *mesh)

@@ -13,15 +13,20 @@ using Int = int;
 
 KOKKOS_INLINE_FUNCTION constexpr Real operator""_fp(long double x) { return x; }
 
-using Vec = Kokkos::Experimental::native_simd<Real>;
-using VecTag = Kokkos::Experimental::element_aligned_tag;
 
 #ifdef OMEGA_NO_SIMD
 #define OMEGA_SIMD_PRAGMA
 constexpr Int vector_length = 1;
 #else
 #define OMEGA_SIMD_PRAGMA _Pragma("omp simd")
-constexpr Int vector_length = Vec::size();
+constexpr Int vector_length = Kokkos::Experimental::native_simd<Real>::size();
+#endif
+
+#ifdef OMEGA_KOKKOS_SIMD
+using Vec = Kokkos::Experimental::native_simd<Real>;
+using VecTag = Kokkos::Experimental::element_aligned_tag;
+#else
+using Vec = Real[vector_length];
 #endif
 
 constexpr Real pi = M_PI;

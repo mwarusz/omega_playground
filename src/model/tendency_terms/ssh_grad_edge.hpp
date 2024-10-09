@@ -63,6 +63,21 @@ struct SSHGradOnEdge {
           m_grav * (h_cell(icell1, k) - h_cell(icell0, k)) * inv_dc_edge;
     }
   }
+  
+  KOKKOS_FUNCTION void operator()(Vec &vn_tend_edge, Int iedge,
+                                  Int kchunk, const RealConst2d &h_cell) const {
+    const Int kstart = kchunk * vector_length;
+    const Int icell0 = m_cells_on_edge(iedge, 0);
+    const Int icell1 = m_cells_on_edge(iedge, 1);
+    const Real inv_dc_edge = 1._fp / m_dc_edge(iedge);
+
+    OMEGA_SIMD_PRAGMA
+    for (Int kvec = 0; kvec < vector_length; ++kvec) {
+      const Int k = kstart + kvec;
+      vn_tend_edge[kvec] -=
+          m_grav * (h_cell(icell1, k) - h_cell(icell0, k)) * inv_dc_edge;
+    }
+  }
 #endif
 
   SSHGradOnEdge(const MPASMesh *mesh, const Real grav)

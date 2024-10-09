@@ -24,6 +24,9 @@ target_compile_definitions(omega_split PUBLIC OMEGA_NO_INNER_IF=1)
 
 add_library(omega_fused)
 
+add_library(omega_fused_accum)
+target_compile_definitions(omega_fused_accum PUBLIC OMEGA_ACCUM=1)
+
 add_library(omega_split_ksimd)
 target_compile_definitions(omega_split_ksimd PUBLIC OMEGA_NO_INNER_IF=1)
 target_compile_definitions(omega_split_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
@@ -33,9 +36,10 @@ target_compile_definitions(omega_fused_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
 
 add_library(omega_fused_accum_ksimd)
 target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
-target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_KSIMD_ACCUM)
+target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_ACCUM=1)
 
-set(OMEGA_LIBS omega_split omega_fused omega_split_ksimd omega_fused_ksimd omega_fused_accum_ksimd)
+set(OMEGA_LIBS omega_split omega_fused omega_fused_accum
+               omega_split_ksimd omega_fused_ksimd omega_fused_accum_ksimd)
 
 foreach(omega_lib IN LISTS OMEGA_LIBS)
   target_link_libraries(${omega_lib} PUBLIC Kokkos::kokkos)

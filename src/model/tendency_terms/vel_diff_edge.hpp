@@ -118,6 +118,33 @@ struct VelocityDiffusionOnEdge {
                                 m_mesh_scaling_del2(iedge) * del2u;
     }
   }
+  
+  KOKKOS_FUNCTION void operator()(Vec &vn_tend_edge, Int iedge,
+                                  Int kchunk, const RealConst2d &div_cell,
+                                  const RealConst2d &rvort_vertex) const {
+    const Int kstart = kchunk * vector_length;
+
+    const Int icell0 = m_cells_on_edge(iedge, 0);
+    const Int icell1 = m_cells_on_edge(iedge, 1);
+
+    const Int ivertex0 = m_vertices_on_edge(iedge, 0);
+    const Int ivertex1 = m_vertices_on_edge(iedge, 1);
+
+    const Real dc_edge_inv = 1._fp / m_dc_edge(iedge);
+    const Real dv_edge_inv = 1._fp / m_dv_edge(iedge);
+
+    OMEGA_SIMD_PRAGMA
+    for (Int kvec = 0; kvec < vector_length; ++kvec) {
+      const Int k = kstart + kvec;
+      const Real del2u =
+          ((div_cell(icell1, k) - div_cell(icell0, k)) * dc_edge_inv -
+           (rvort_vertex(ivertex1, k) - rvort_vertex(ivertex0, k)) *
+               dv_edge_inv);
+
+      vn_tend_edge[kvec] += m_edge_mask(iedge, k) * m_visc_del2 *
+                                m_mesh_scaling_del2(iedge) * del2u;
+    }
+  }
 #endif
 
   VelocityDiffusionOnEdge(const MPASMesh *mesh, Real visc_del2)

@@ -187,14 +187,29 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
   omega_parallel_for(
       "compute_vtend", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
       KOKKOS_LAMBDA(Int iedge, Int kchunk) {
-#ifdef OMEGA_KSIMD_ACCUM
+#ifdef OMEGA_ACCUM
         Vec vn_tend_iedge;
         const Int kstart = kchunk * vector_length;
 
         if (add_mode == AddMode::replace) {
+#ifdef OMEGA_KOKKOS_SIMD
           vn_tend_iedge = 0._fp;
+#else
+          for (Int kvec = 0; kvec < vector_length; ++kvec) {
+            const Int k = kchunk * vector_length + kvec;
+            vn_tend_iedge[kvec] = 0._fp;
+          }
+#endif
+
         } else {
+#ifdef OMEGA_KOKKOS_SIMD
           vn_tend_iedge.copy_from(&vn_tend_edge(iedge, kstart), VecTag());
+#else
+          for (Int kvec = 0; kvec < vector_length; ++kvec) {
+            const Int k = kchunk * vector_length + kvec;
+            vn_tend_iedge[kvec] = vn_tend_edge(iedge, k);
+          }
+#endif
         }
 
         if (pv_flux_edge.m_enabled) {
@@ -219,7 +234,14 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           vel_hyperdiff_edge(vn_tend_iedge, iedge, kchunk);
         }
         
+#ifdef OMEGA_KOKKOS_SIMD
         vn_tend_iedge.copy_to(&vn_tend_edge(iedge, kstart), VecTag());
+#else
+        for (Int kvec = 0; kvec < vector_length; ++kvec) {
+          const Int k = kchunk * vector_length + kvec;
+          vn_tend_edge(iedge, k) = vn_tend_iedge[kvec];
+        }
+#endif
       });
 #else
         if (add_mode == AddMode::replace) {
