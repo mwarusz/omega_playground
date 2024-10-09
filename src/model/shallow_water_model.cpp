@@ -131,7 +131,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
   timer_start("vel_tend_only");
 #ifdef OMEGA_NO_INNER_IF
-  if (add_mode == AddMode::replace) {
+  #ifndef OMEGA_NO_IF
+  if (add_mode == AddMode::replace)
+  #endif
+  {
     omega_parallel_for(
         "compute_vtend1", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -142,7 +145,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
-  if (pv_flux_edge.m_enabled) {
+  #ifndef OMEGA_NO_IF
+  if (pv_flux_edge.m_enabled)
+  #endif
+  {
     omega_parallel_for(
         "compute_vtend2", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -151,7 +157,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
-  if (ke_grad_edge.m_enabled) {
+  #ifndef OMEGA_NO_IF
+  if (ke_grad_edge.m_enabled)
+  #endif
+  {
     omega_parallel_for(
         "compute_vtend3", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -159,7 +168,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
-  if (ssh_grad_edge.m_enabled) {
+  #ifndef OMEGA_NO_IF
+  if (ssh_grad_edge.m_enabled)
+  #endif
+  {
     omega_parallel_for(
         "compute_vtend4", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -167,7 +179,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
-  if (vel_diff_edge.m_enabled) {
+  #ifndef OMEGA_NO_IF
+  if (vel_diff_edge.m_enabled)
+  #endif
+  {
     omega_parallel_for(
         "compute_vtend5", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -176,7 +191,10 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         });
   }
 
-  if (vel_hyperdiff_edge.m_enabled) {
+  #ifndef OMEGA_NO_IF
+  if (vel_hyperdiff_edge.m_enabled)
+  #endif
+  {
     omega_parallel_for(
         "compute_vtend6", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -191,7 +209,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         Vec vn_tend_iedge;
         const Int kstart = kchunk * vector_length;
 
-        if (add_mode == AddMode::replace) {
+        if (add_mode == AddMode::replace)
+        {
 #ifdef OMEGA_KOKKOS_SIMD
           vn_tend_iedge = 0._fp;
 #else
@@ -212,25 +231,40 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 #endif
         }
 
-        if (pv_flux_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (pv_flux_edge.m_enabled)
+        #endif
+        {
           pv_flux_edge(vn_tend_iedge, iedge, kchunk, norm_rvort_edge,
                        norm_pvort_edge, flux_h_edge, vn_edge);
         }
 
-        if (ke_grad_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (ke_grad_edge.m_enabled)
+        #endif
+        {
           ke_grad_edge(vn_tend_iedge, iedge, kchunk, ke_cell);
         }
 
-        if (ssh_grad_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (ssh_grad_edge.m_enabled)
+        #endif
+        {
           ssh_grad_edge(vn_tend_iedge, iedge, kchunk, h_cell);
         }
 
-        if (vel_diff_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (vel_diff_edge.m_enabled)
+        #endif
+        {
           vel_diff_edge(vn_tend_iedge, iedge, kchunk, vel_div_cell,
                         rvort_vertex);
         }
 
-        if (vel_hyperdiff_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (vel_hyperdiff_edge.m_enabled)
+        #endif
+        {
           vel_hyperdiff_edge(vn_tend_iedge, iedge, kchunk);
         }
         
@@ -251,25 +285,40 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           }
         }
 
-        if (pv_flux_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (pv_flux_edge.m_enabled)
+        #endif
+        {
           pv_flux_edge(vn_tend_edge, iedge, kchunk, norm_rvort_edge,
                        norm_pvort_edge, flux_h_edge, vn_edge);
         }
 
-        if (ke_grad_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (ke_grad_edge.m_enabled)
+        #endif
+        {
           ke_grad_edge(vn_tend_edge, iedge, kchunk, ke_cell);
         }
 
-        if (ssh_grad_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (ssh_grad_edge.m_enabled)
+        #endif
+        {
           ssh_grad_edge(vn_tend_edge, iedge, kchunk, h_cell);
         }
 
-        if (vel_diff_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (vel_diff_edge.m_enabled)
+        #endif
+        {
           vel_diff_edge(vn_tend_edge, iedge, kchunk, vel_div_cell,
                         rvort_vertex);
         }
 
-        if (vel_hyperdiff_edge.m_enabled) {
+        #ifndef OMEGA_NO_IF
+        if (vel_hyperdiff_edge.m_enabled)
+        #endif
+        {
           vel_hyperdiff_edge(vn_tend_edge, iedge, kchunk);
         }
       });
