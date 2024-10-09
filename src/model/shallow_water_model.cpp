@@ -131,10 +131,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 
   timer_start("vel_tend_only");
 #ifdef OMEGA_NO_INNER_IF
-  #ifndef OMEGA_NO_IF
-  if (add_mode == AddMode::replace)
-  #endif
-  {
+  
     omega_parallel_for(
         "compute_vtend1", {m_mesh->m_nedges, m_mesh->m_nlayers_vec},
         KOKKOS_LAMBDA(Int iedge, Int kchunk) {
@@ -143,7 +140,7 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
             vn_tend_edge(iedge, k) = 0;
           }
         });
-  }
+  
 
   #ifndef OMEGA_NO_IF
   if (pv_flux_edge.m_enabled)
@@ -209,8 +206,8 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
         Vec vn_tend_iedge;
         const Int kstart = kchunk * vector_length;
 
-        if (add_mode == AddMode::replace)
-        {
+//        if (add_mode == AddMode::replace)
+//        {
 #ifdef OMEGA_KOKKOS_SIMD
           vn_tend_iedge = 0._fp;
 #else
@@ -220,16 +217,16 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
           }
 #endif
 
-        } else {
-#ifdef OMEGA_KOKKOS_SIMD
-          vn_tend_iedge.copy_from(&vn_tend_edge(iedge, kstart), VecTag());
-#else
-          for (Int kvec = 0; kvec < vector_length; ++kvec) {
-            const Int k = kchunk * vector_length + kvec;
-            vn_tend_iedge[kvec] = vn_tend_edge(iedge, k);
-          }
-#endif
-        }
+//        } else {
+//#ifdef OMEGA_KOKKOS_SIMD
+//          vn_tend_iedge.copy_from(&vn_tend_edge(iedge, kstart), VecTag());
+//#else
+//          for (Int kvec = 0; kvec < vector_length; ++kvec) {
+//            const Int k = kchunk * vector_length + kvec;
+//            vn_tend_iedge[kvec] = vn_tend_edge(iedge, k);
+//          }
+//#endif
+//        }
 
         #ifndef OMEGA_NO_IF
         if (pv_flux_edge.m_enabled)
@@ -278,12 +275,12 @@ void ShallowWaterModel::compute_vn_tendency(Real2d vn_tend_edge,
 #endif
       });
 #else
-        if (add_mode == AddMode::replace) {
+//        if (add_mode == AddMode::replace) {
           for (Int kvec = 0; kvec < vector_length; ++kvec) {
             const Int k = kchunk * vector_length + kvec;
             vn_tend_edge(iedge, k) = 0;
           }
-        }
+//        }
 
         #ifndef OMEGA_NO_IF
         if (pv_flux_edge.m_enabled)
