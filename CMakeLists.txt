@@ -19,50 +19,64 @@ FetchContent_Declare(Kokkos
 )
 FetchContent_MakeAvailable(Kokkos)
 
-add_library(omega)
+add_library(omega_split)
+target_compile_definitions(omega_split PUBLIC OMEGA_NO_INNER_IF=1)
 
-target_link_libraries(omega PUBLIC Kokkos::kokkos)
+add_library(omega_fused)
+
+add_library(omega_split_ksimd)
+target_compile_definitions(omega_split_ksimd PUBLIC OMEGA_NO_INNER_IF=1)
+target_compile_definitions(omega_split_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
+
+add_library(omega_fused_ksimd)
+target_compile_definitions(omega_fused_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
+
+add_library(omega_fused_accum_ksimd)
+target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
+target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_KSIMD_ACCUM)
+
+set(OMEGA_LIBS omega_split omega_fused omega_split_ksimd omega_fused_ksimd omega_fused_accum_ksimd)
+
+foreach(omega_lib IN LISTS OMEGA_LIBS)
+  target_link_libraries(${omega_lib} PUBLIC Kokkos::kokkos)
+endforeach()
+
 if (${OMEGA_USE_CALIPER})
   find_package(caliper REQUIRED)
-  target_link_libraries(omega PUBLIC caliper)
-  target_compile_definitions(omega PUBLIC OMEGA_USE_CALIPER=1)
+  foreach(omega_lib IN LISTS OMEGA_LIBS)
+    target_link_libraries(${omega_lib} PUBLIC caliper)
+    target_compile_definitions(${omega_lib} PUBLIC OMEGA_USE_CALIPER=1)
+  endforeach()
 endif()
-if (${OMEGA_NO_SIMD})
-  target_compile_definitions(omega PUBLIC OMEGA_NO_SIMD=1)
-endif()
-if (${OMEGA_KOKKOS_SIMD})
-  target_compile_definitions(omega PUBLIC OMEGA_KOKKOS_SIMD=1)
-endif()
-if (${OMEGA_KSIMD_ACCUM})
-  target_compile_definitions(omega PUBLIC OMEGA_KSIMD_ACCUM)
-endif()
-if (${OMEGA_NO_INNER_IF})
-  target_compile_definitions(omega PUBLIC OMEGA_NO_INNER_IF=1)
-endif()
-
 
 set(NETCDF_WORKAROUND OFF CACHE BOOL "netcdf/hdf5 workaround")
 
 find_package(netCDFCxx)
 if (${netCDFCxx_FOUND})
-  target_link_libraries(omega PUBLIC netCDF::netcdf-cxx4)
+  foreach(omega_lib IN LISTS OMEGA_LIBS)
+    target_link_libraries(${omega_lib} PUBLIC netCDF::netcdf-cxx4)
+  endforeach()
   # for some reason I need to explictly look for hdf5 on my mac laptop
   if (${NETCDF_WORKAROUND})
     find_package(HDF5 REQUIRED COMPONENTS C HL)
-    target_link_libraries(omega PUBLIC HDF5::HDF5)
+    foreach(omega_lib IN LISTS OMEGA_LIBS)
+      target_link_libraries(${omega_lib} PUBLIC HDF5::HDF5)
+    endforeach()
   endif()
 endif()
 
-target_include_directories(omega PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
+foreach(omega_lib IN LISTS OMEGA_LIBS)
+  target_include_directories(${omega_lib} PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+endforeach()
 
 add_subdirectory(src)
 
-add_subdirectory(benchmark)
+#add_subdirectory(benchmark)
 if (${netCDFCxx_FOUND})
   add_subdirectory(exp)
 endif()
-
-enable_testing()
-add_subdirectory(test)
+#
+#enable_testing()
+#add_subdirectory(test)

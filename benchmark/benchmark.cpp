@@ -83,102 +83,108 @@ struct DoubleVortex {
 void run(Int nx, Int nlayers, Int ntracers, Int nsteps) {
   DoubleVortex double_vortex;
 
-  Real dc = double_vortex.m_lx / nx;
+  Real dc = 1.0 / nx;
   Int ny = nx;
   auto mesh = std::make_unique<PlanarHexagonalMesh>(nx, ny, dc, nlayers);
 
-  ShallowWaterParams params;
-  params.m_ntracers = ntracers;
-  params.m_f0 = double_vortex.m_coriolis;
-  params.m_grav = double_vortex.m_g;
-  // just to turn these on
-  params.m_visc_del2 = 1e-5;
-  params.m_visc_del4 = 1e-5;
-  params.m_eddy_diff2 = 1e-5;
-  params.m_eddy_diff4 = 1e-5;
-
-  ShallowWaterModel shallow_water(mesh.get(), params);
-
-  ShallowWaterState state(mesh.get(), params);
-
-  LSRKStepper stepper(shallow_water, nsteps == 1 ? 1 : 5);
-
-  Real cfl = 0.1;
-  Real dt = cfl * mesh->m_dc / std::sqrt(params.m_grav * double_vortex.m_h0);
-  Int numberofsteps = nsteps;
-
-  auto &h_cell = state.m_h_cell;
-  auto &tr_cell = state.m_tr_cell;
-  OMEGA_SCOPE(x_cell, mesh->m_x_cell);
-  OMEGA_SCOPE(y_cell, mesh->m_y_cell);
-  parallel_for(
-      "init_h", MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
-      KOKKOS_LAMBDA(Int icell, Int k) {
-        Real x = x_cell(icell);
-        Real y = y_cell(icell);
-        h_cell(icell, k) = double_vortex.h(x, y);
-      });
-
-  if (ntracers > 0) {
-    parallel_for(
-        "init_tr",
-        MDRangePolicy<3>({0, 0, 0},
-                         {ntracers, mesh->m_ncells, mesh->m_nlayers}),
-        KOKKOS_LAMBDA(Int l, Int icell, Int k) {
-          tr_cell(l, icell, k) = 1000;
-        });
+  auto x_vertex = mesh->m_x_vertex;
+  auto y_vertex = mesh->m_y_vertex;
+  for (Int i = 0; i < mesh->m_nvertices; ++i) {
+    std::cout << i << " " << x_vertex(i) << " " << y_vertex(i) << std::endl;
   }
 
-  auto &vn_edge = state.m_vn_edge;
-  OMEGA_SCOPE(x_edge, mesh->m_x_edge);
-  OMEGA_SCOPE(y_edge, mesh->m_y_edge);
-  OMEGA_SCOPE(angle_edge, mesh->m_angle_edge);
-  parallel_for(
-      "init_vn", MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers}),
-      KOKKOS_LAMBDA(Int iedge, Int k) {
-        Real x = x_edge(iedge);
-        Real y = y_edge(iedge);
-        Real nx = std::cos(angle_edge(iedge));
-        Real ny = std::sin(angle_edge(iedge));
-        Real vx = double_vortex.vx(x, y);
-        Real vy = double_vortex.vy(x, y);
-        vn_edge(iedge, k) = nx * vx + ny * vy;
-      });
-
-  stepper.do_step(0, dt, state);
-
-#ifdef BENCHMARK_PROFILE_CUDA
-  cudaProfilerStart();
-#endif
-
-  timer_start("time_integration");
-
-  Kokkos::fence();
-  auto ts = std::chrono::steady_clock::now();
-  for (Int step = 0; step < numberofsteps; ++step) {
-    Real t = (step + 1) * dt;
-    stepper.do_step(t, dt, state);
-  }
-  Kokkos::fence();
-  auto te = std::chrono::steady_clock::now();
-  auto time_loop_second = std::chrono::duration<double>(te - ts).count();
-
-  timer_stop("time_integration");
-
-#ifdef BENCHMARK_PROFILE_CUDA
-  cudaProfilerStop();
-#endif
-
-  // std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
-  //           << yakl::intrinsics::maxval(h_cell) << std::endl;
-  // std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
-  //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
-  // if (ntracers > 0) {
-  //   std::cout << "Final tr: " << yakl::intrinsics::minval(tr_cell) << " "
-  //             << yakl::intrinsics::maxval(tr_cell) << std::endl;
-  // }
-
-  std::cerr << time_loop_second << std::endl;
+//  ShallowWaterParams params;
+//  params.m_ntracers = ntracers;
+//  params.m_f0 = double_vortex.m_coriolis;
+//  params.m_grav = double_vortex.m_g;
+//  // just to turn these on
+//  params.m_visc_del2 = 1e-5;
+//  params.m_visc_del4 = 1e-5;
+//  params.m_eddy_diff2 = 1e-5;
+//  params.m_eddy_diff4 = 1e-5;
+//
+//  ShallowWaterModel shallow_water(mesh.get(), params);
+//
+//  ShallowWaterState state(mesh.get(), params);
+//
+//  LSRKStepper stepper(shallow_water, nsteps == 1 ? 1 : 5);
+//
+//  Real cfl = 0.1;
+//  Real dt = cfl * mesh->m_dc / std::sqrt(params.m_grav * double_vortex.m_h0);
+//  Int numberofsteps = nsteps;
+//
+//  auto &h_cell = state.m_h_cell;
+//  auto &tr_cell = state.m_tr_cell;
+//  OMEGA_SCOPE(x_cell, mesh->m_x_cell);
+//  OMEGA_SCOPE(y_cell, mesh->m_y_cell);
+//  parallel_for(
+//      "init_h", MDRangePolicy<2>({0, 0}, {mesh->m_ncells, mesh->m_nlayers}),
+//      KOKKOS_LAMBDA(Int icell, Int k) {
+//        Real x = x_cell(icell);
+//        Real y = y_cell(icell);
+//        h_cell(icell, k) = double_vortex.h(x, y);
+//      });
+//
+//  if (ntracers > 0) {
+//    parallel_for(
+//        "init_tr",
+//        MDRangePolicy<3>({0, 0, 0},
+//                         {ntracers, mesh->m_ncells, mesh->m_nlayers}),
+//        KOKKOS_LAMBDA(Int l, Int icell, Int k) {
+//          tr_cell(l, icell, k) = 1000;
+//        });
+//  }
+//
+//  auto &vn_edge = state.m_vn_edge;
+//  OMEGA_SCOPE(x_edge, mesh->m_x_edge);
+//  OMEGA_SCOPE(y_edge, mesh->m_y_edge);
+//  OMEGA_SCOPE(angle_edge, mesh->m_angle_edge);
+//  parallel_for(
+//      "init_vn", MDRangePolicy<2>({0, 0}, {mesh->m_nedges, mesh->m_nlayers}),
+//      KOKKOS_LAMBDA(Int iedge, Int k) {
+//        Real x = x_edge(iedge);
+//        Real y = y_edge(iedge);
+//        Real nx = std::cos(angle_edge(iedge));
+//        Real ny = std::sin(angle_edge(iedge));
+//        Real vx = double_vortex.vx(x, y);
+//        Real vy = double_vortex.vy(x, y);
+//        vn_edge(iedge, k) = nx * vx + ny * vy;
+//      });
+//
+//  stepper.do_step(0, dt, state);
+//
+//#ifdef BENCHMARK_PROFILE_CUDA
+//  cudaProfilerStart();
+//#endif
+//
+//  timer_start("time_integration");
+//
+//  Kokkos::fence();
+//  auto ts = std::chrono::steady_clock::now();
+//  for (Int step = 0; step < numberofsteps; ++step) {
+//    Real t = (step + 1) * dt;
+//    stepper.do_step(t, dt, state);
+//  }
+//  Kokkos::fence();
+//  auto te = std::chrono::steady_clock::now();
+//  auto time_loop_second = std::chrono::duration<double>(te - ts).count();
+//
+//  timer_stop("time_integration");
+//
+//#ifdef BENCHMARK_PROFILE_CUDA
+//  cudaProfilerStop();
+//#endif
+//
+//  // std::cout << "Final h: " << yakl::intrinsics::minval(h_cell) << " "
+//  //           << yakl::intrinsics::maxval(h_cell) << std::endl;
+//  // std::cout << "Final vn: " << yakl::intrinsics::minval(vn_edge) << " "
+//  //           << yakl::intrinsics::maxval(vn_edge) << std::endl;
+//  // if (ntracers > 0) {
+//  //   std::cout << "Final tr: " << yakl::intrinsics::minval(tr_cell) << " "
+//  //             << yakl::intrinsics::maxval(tr_cell) << std::endl;
+//  // }
+//
+//  std::cerr << time_loop_second << std::endl;
 }
 
 int main(int argc, char *argv[]) {
