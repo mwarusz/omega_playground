@@ -27,6 +27,17 @@ add_library(omega_fused)
 add_library(omega_fused_accum)
 target_compile_definitions(omega_fused_accum PUBLIC OMEGA_ACCUM=1)
 
+add_library(omega_split_osimd)
+target_compile_definitions(omega_split_osimd PUBLIC OMEGA_NO_INNER_IF=1)
+target_compile_options(omega_split_osimd PUBLIC -fopenmp-simd)
+
+add_library(omega_fused_osimd)
+target_compile_options(omega_fused_osimd PUBLIC -fopenmp-simd)
+
+add_library(omega_fused_accum_osimd)
+target_compile_definitions(omega_fused_accum_osimd PUBLIC OMEGA_ACCUM=1)
+target_compile_options(omega_fused_accum_osimd PUBLIC -fopenmp-simd)
+
 add_library(omega_split_ksimd)
 target_compile_definitions(omega_split_ksimd PUBLIC OMEGA_NO_INNER_IF=1)
 target_compile_definitions(omega_split_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
@@ -39,6 +50,7 @@ target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_KOKKOS_SIMD=1)
 target_compile_definitions(omega_fused_accum_ksimd PUBLIC OMEGA_ACCUM=1)
 
 set(OMEGA_LIBS omega_split omega_fused omega_fused_accum
+               omega_split_osimd omega_fused_osimd omega_fused_accum_osimd
                omega_split_ksimd omega_fused_ksimd omega_fused_accum_ksimd)
 
 foreach(omega_lib IN LISTS OMEGA_LIBS)
