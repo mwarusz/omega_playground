@@ -69,6 +69,10 @@ struct MPASMesh {
 
   MPASMesh(Int ncells, Int nedges, Int nvertices, Int nlayers);
   void finalize_mesh();
+  
+  void reorder_mesh_vertex();
+  void reorder_mesh_edge();
+  void reorder_mesh_cell();
 };
 
 } // namespace omega

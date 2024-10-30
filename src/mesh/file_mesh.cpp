@@ -59,7 +59,10 @@ FileMesh::FileMesh(const netCDF::NcFile &mesh_file, Int nlayers)
   get_from_file("kiteAreasOnVertex", mesh_file, m_kiteareas_on_vertex);
 
   convert_fortran_indices_to_cxx();
+
   finalize_mesh();
+  
+  reorder_mesh_edge();
 }
 
 void FileMesh::convert_fortran_indices_to_cxx() const {

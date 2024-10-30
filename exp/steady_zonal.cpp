@@ -65,7 +65,7 @@ Real run() {
       },
       Kokkos::Min<Real>(min_dc_edge));
 
-  Real timeend = day;
+  Real timeend = day / 8;
   Real cfl = 0.6;
   Real dt = cfl * min_dc_edge /
             (steady_zonal.m_u0 + std::sqrt(grav * steady_zonal.m_h0));
